@@ -6,17 +6,21 @@
 [![Backend: Supabase](https://img.shields.io/badge/Backend-Supabase_Postgres-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com)
 [![Auth: Supabase & Resend](https://img.shields.io/badge/Auth-Email_OTP-000000?style=for-the-badge&logo=resend&logoColor=white)](https://supabase.com)
 [![Notifications: Firebase FCM](https://img.shields.io/badge/Notifications-Firebase_FCM-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://firebase.google.com)
-[![Latest Release](https://img.shields.io/badge/Release-v1.3_Stable-0284C7?style=for-the-badge&logo=android&logoColor=white)](https://github.com/gitworld08210/Hydrogen-bot/raw/main/release/HydrogenBot-v1.3.apk)
+[![Latest Release](https://img.shields.io/badge/Release-v1.4_Stable-0284C7?style=for-the-badge&logo=android&logoColor=white)](https://github.com/gitworld08210/Hydrogen-bot/raw/main/release/HydrogenBot-v1.4.apk)
 
 ---
 
-## 📲 Direct APK Download (v1.3 - Mark-LVII Engine & Hindi Intent Fix)
+## 📲 Direct APK Download (v1.4 - Vision Lens & Morning Briefing)
 
 Aap seedha apne Android phone me latest signed APK download aur install kar sakte hain:
 
-👉 **[Download HydrogenBot-v1.3.apk (Direct Download)](https://github.com/gitworld08210/Hydrogen-bot/raw/main/release/HydrogenBot-v1.3.apk)** *(Size: ~13.9 MB)*
+👉 **[Download HydrogenBot-v1.4.apk (Direct Download)](https://github.com/gitworld08210/Hydrogen-bot/raw/main/release/HydrogenBot-v1.4.apk)** *(Size: ~13.9 MB)*
 
-### 🆕 What's New in v1.3:
+### 🆕 What's New in v1.4:
+* 📸 **Gemini Multimodal Vision Lens (`HomeScreen.kt` & `GeminiIntentParser.kt`):** Top bar me Camera icon tap karein ya bolen *"Photo scan karo"* — kisi bhi product ki photo khinchte hi Gemini Vision brand/product pehchaan kar screen par **"Search on Amazon"** aur **"Search on Flipkart"** direct buttons show karta hai!
+* 🌅 **Jarvis Morning Briefing & Battery Guard:** *"Good morning"* ya *"Battery check"* bolne par bot live battery status, time aur personalized Hindi greeting audio me bolta hai. (Agar battery <25% hai toh low-battery alert deta hai).
+* 💬 **WhatsApp Pre-filled Voice Messaging:** *"WhatsApp pe Mummy ko message bhejo 10 minute me aa raha hu"* bolne par seedha WhatsApp khulta hai aur text box me message already type ho jata hai.
+* 👆 **1-Tap Biometric Unlock (Fingerprint / Face):** Login screen par ab baar-baar OTP daalne ki zarurat nahi — 1 tap me Fingerprint/Face sensor se 0.2s me unlock karein!
 * 🚀 **Mark-LVII Multi-Model Ladder (`GeminiIntentParser.kt`):** Upgraded to Mark-LVII's measured fast model ladder (`gemini-3.5-flash-lite` → `gemini-flash-lite-latest` → `gemini-3.8-flash`), delivering responses in under 0.6 seconds.
 * 🇮🇳 **Devanagari Hindi & Hinglish Offline Recognition:** Fixed the issue where speech recognized in Devanagari Hindi (e.g. `"यूट्यूब"`, `"अमेज़न"`, `"फ्लिपकार्ट"`, `"गाना"`) was not matching English keywords.
 * ⚡ **Instant Direct Native App Launch:** Saying just `"YouTube"` or `"यूट्यूब"` instantly launches the official YouTube app to its home feed, instead of falling back to robotic search text.
