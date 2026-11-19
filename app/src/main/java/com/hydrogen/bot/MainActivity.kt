@@ -1,8 +1,10 @@
 package com.hydrogen.bot
 
 import android.Manifest
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
+import android.speech.RecognizerIntent
 import android.widget.Toast
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -47,14 +49,26 @@ class MainActivity : FragmentActivity(), VoiceListener {
     private var isLoggedIn by mutableStateOf(false)
     private var currentScreen by mutableStateOf("home") // "home", "auth", "vault"
 
-    // Audio Permission Request Handler
+    // Microphone Permission Request Handler
     private val requestPermissionLauncher = registerForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { isGranted: Boolean ->
         if (isGranted) {
-            voiceManager.startListening()
+            safeStartListening()
         } else {
-            Toast.makeText(this, "Microphone permission zaroori hai.", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, "Microphone permission zaroori hai voice assistant ke liye.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Bulletproof Native System Voice Dialog Fallback (100% crash-free)
+    private val systemVoiceDialogLauncher = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == RESULT_OK && result.data != null) {
+            val matches = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
+            if (!matches.isNullOrEmpty()) {
+                onVoiceResult(matches[0])
+            }
         }
     }
 
@@ -129,14 +143,26 @@ class MainActivity : FragmentActivity(), VoiceListener {
     }
 
     private fun toggleListening() {
-        if (isListening) {
-            voiceManager.stopListening()
-        } else {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
-                voiceManager.startListening()
+        try {
+            if (isListening) {
+                voiceManager.stopListening()
             } else {
-                requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                    safeStartListening()
+                } else {
+                    requestPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                }
             }
+        } catch (e: Exception) {
+            onRequestSystemVoiceDialog(voiceManager.createSpeechIntent())
+        }
+    }
+
+    private fun safeStartListening() {
+        try {
+            voiceManager.startListening()
+        } catch (e: Exception) {
+            onRequestSystemVoiceDialog(voiceManager.createSpeechIntent())
         }
     }
 
@@ -147,7 +173,7 @@ class MainActivity : FragmentActivity(), VoiceListener {
             lastIntent = intent
             statusText = intent.speechFeedback
 
-            // Voice Feedback (Speaks in Hindi/English)
+            // Natural voice reply
             ttsManager.speak(intent.speechFeedback)
 
             // Autonomous Action Execution Engine
@@ -172,7 +198,6 @@ class MainActivity : FragmentActivity(), VoiceListener {
                     isLastNativeApp = result.isNativeApp
                 }
                 ActionType.BOOK_TICKET_IRCTC -> {
-                    // Safety Guardrail Triggered: Bot announces stop before payment
                     isLastNativeApp = true
                 }
                 else -> {
@@ -183,9 +208,9 @@ class MainActivity : FragmentActivity(), VoiceListener {
     }
 
     // Voice Listener Callbacks
-    override fun onListeningStateChanged(isListeningState: Boolean) {
-        isListening = isListeningState
-        statusText = if (isListeningState) "Listening…" else "Hydrogen Ready"
+    override fun onListeningStateChanged(isListening: Boolean) {
+        this.isListening = isListening
+        statusText = if (isListening) "Listening…" else "Hydrogen Ready"
     }
 
     override fun onRmsVolumeChanged(rmsdB: Float) {
@@ -199,6 +224,14 @@ class MainActivity : FragmentActivity(), VoiceListener {
 
     override fun onVoiceError(errorMsg: String) {
         statusText = errorMsg
+    }
+
+    override fun onRequestSystemVoiceDialog(intent: Intent) {
+        try {
+            systemVoiceDialogLauncher.launch(intent)
+        } catch (e: Exception) {
+            Toast.makeText(this, "Voice recognition available nahi hai.", Toast.LENGTH_SHORT).show()
+        }
     }
 
     override fun onDestroy() {

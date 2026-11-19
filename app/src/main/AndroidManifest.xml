@@ -11,6 +11,11 @@
 
     <!-- Package queries for Native App Detection (Android 11+) -->
     <queries>
+        <!-- Speech Recognition Service Query (Mandatory for Android 11+) -->
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+
         <!-- Amazon Native Apps -->
         <package android:name="in.amazon.mShop.android.shopping" />
         <package android:name="com.amazon.mShop.android.shopping" />

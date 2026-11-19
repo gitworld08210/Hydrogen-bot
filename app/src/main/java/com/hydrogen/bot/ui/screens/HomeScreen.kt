@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -20,27 +21,41 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountCircle
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.ChatBubbleOutline
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.Send
+import androidx.compose.material.icons.filled.ShoppingBag
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hydrogen.bot.ai.ParsedIntent
 import com.hydrogen.bot.ui.components.ActionCard
 import com.hydrogen.bot.ui.components.HydrogenMicButton
+import com.hydrogen.bot.ui.components.OrganicSoundCapsules
+import com.hydrogen.bot.ui.components.ProductCard
+import com.hydrogen.bot.ui.components.ProductItem
 import com.hydrogen.bot.ui.components.SafetyGateCard
-import com.hydrogen.bot.ui.components.WaveformVisualizer
 import com.hydrogen.bot.ui.theme.CanvasWhite
 import com.hydrogen.bot.ui.theme.HairlineBorder
-import com.hydrogen.bot.ui.theme.HydrogenBlue
-import com.hydrogen.bot.ui.theme.HydrogenPillBg
 import com.hydrogen.bot.ui.theme.SlateDark
 import com.hydrogen.bot.ui.theme.SlateMuted
 import com.hydrogen.bot.ui.theme.SlateSecondary
@@ -60,11 +75,14 @@ fun HomeScreen(
     onQuickCommandClick: (String) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val quickSuggestions = listOf(
-        "Amazon pe running shoes search karo",
-        "YouTube pe Arijit Singh ke gaane chalao",
-        "Flipkart pe wireless earbuds dhundo",
-        "WhatsApp pe message bhejo"
+    // Mode toggle between "Voice Chat" (Middle Screen) and "AI Ask" (Right Screen)
+    var isChatView by remember { mutableStateOf(false) }
+    var textInput by remember { mutableStateOf("") }
+
+    val moodCategories = listOf("Shoes", "Electronics", "Mobiles", "Watches", "Deals")
+    val curatedProducts = listOf(
+        ProductItem("1", "Running Shoes Elite", "₹1,499.00", "15% Off", "Amazon"),
+        ProductItem("2", "Wireless Earbuds Pro", "₹999.00", "20% Off", "Amazon")
     )
 
     Column(
@@ -75,147 +93,309 @@ fun HomeScreen(
         verticalArrangement = Arrangement.SpaceBetween,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        // TOP APP BAR
+        // TOP APP BAR (From reference design)
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
-                Text(
-                    text = "Hydrogen Bot",
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = SlateDark
-                )
-                Text(
-                    text = "Lightweight Autonomous Voice Assistant",
-                    fontSize = 12.sp,
-                    color = SlateMuted
+            // Circular Back / Mode Button
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFF8FAFC))
+                    .border(1.dp, HairlineBorder, CircleShape)
+                    .clickable { isChatView = !isChatView },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                    contentDescription = "Toggle",
+                    tint = SlateDark,
+                    modifier = Modifier.size(18.dp)
                 )
             }
 
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Secure Vault Shortcut Button
-                IconButton(
-                    onClick = onOpenVault,
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(SurfacePearl)
-                        .border(1.dp, HairlineBorder, CircleShape)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Lock,
-                        contentDescription = "Password Vault",
-                        tint = HydrogenBlue,
-                        modifier = Modifier.size(18.dp)
-                    )
-                }
+            // Center Title
+            Text(
+                text = if (isChatView) "AI Ask" else "Voice Chat",
+                fontSize = 17.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = SlateDark
+            )
 
-                // User Email Indicator Pill
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(SurfacePearl)
-                        .border(1.dp, HairlineBorder, RoundedCornerShape(20.dp))
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.AccountCircle,
-                            contentDescription = null,
-                            tint = SlateSecondary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Text(
-                            text = userEmail.substringBefore("@"),
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = SlateDark
-                        )
-                    }
-                }
+            // Right Circular Vault / Bag Button
+            Box(
+                modifier = Modifier
+                    .size(42.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFF8FAFC))
+                    .border(1.dp, HairlineBorder, CircleShape)
+                    .clickable { onOpenVault() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Lock,
+                    contentDescription = "Vault",
+                    tint = SlateDark,
+                    modifier = Modifier.size(18.dp)
+                )
             }
         }
 
-        // MIDDLE CONTENT: Live Status, Transcript & Action Cards
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState()),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // State & Waveform Pill
-            Box(
+        // MIDDLE CONTENT: Toggle between Voice Mode & Chat/Product Mode
+        if (!isChatView) {
+            // ==================== MODE 1: VOICE CHAT (SCREEN 2 IN REFERENCE) ====================
+            Column(
                 modifier = Modifier
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(SurfacePearl)
-                    .border(1.dp, HairlineBorder, RoundedCornerShape(24.dp))
-                    .padding(horizontal = 16.dp, vertical = 8.dp)
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    WaveformVisualizer(
-                        isListening = isListening,
-                        volumeRms = volumeRms
-                    )
-                    Text(
-                        text = statusText,
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = if (isListening) HydrogenBlue else SlateDark
-                    )
-                }
-            }
+                Spacer(modifier = Modifier.height(24.dp))
 
-            // Real-Time Transcript Display
-            if (transcriptText.isNotBlank()) {
+                // The Signature 4 Organic Sound Capsules
+                OrganicSoundCapsules(
+                    isListening = isListening,
+                    volumeRms = volumeRms
+                )
+
+                Spacer(modifier = Modifier.height(48.dp))
+
+                // Pill Tag Badge: "Your Assistant 3.0"
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(SurfacePearl)
-                        .border(1.dp, HairlineBorder, RoundedCornerShape(16.dp))
-                        .padding(16.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(Color(0xFFF8FAFC))
+                        .border(1.dp, HairlineBorder, RoundedCornerShape(20.dp))
+                        .padding(horizontal = 14.dp, vertical = 6.dp)
                 ) {
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(
-                            text = "VOICE INPUT",
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = SlateMuted
-                        )
+                    Text(
+                        text = "Hydrogen Assistant 3.0",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = SlateSecondary
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Headline
+                Text(
+                    text = "Smart Voice Assistant",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = SlateDark,
+                    textAlign = TextAlign.Center
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Subtitle
+                Text(
+                    text = if (isListening) "Listening in Hindi & English…" else "I'm Here To Assist You With Anything Today",
+                    fontSize = 14.sp,
+                    color = SlateSecondary,
+                    textAlign = TextAlign.Center
+                )
+
+                // Voice Transcript Box (If spoken)
+                if (transcriptText.isNotBlank()) {
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(Color(0xFFF8FAFC))
+                            .border(1.dp, HairlineBorder, RoundedCornerShape(16.dp))
+                            .padding(14.dp)
+                    ) {
                         Text(
                             text = "\"$transcriptText\"",
-                            fontSize = 16.sp,
+                            fontSize = 15.sp,
                             fontWeight = FontWeight.Normal,
-                            color = SlateDark
+                            color = SlateDark,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+
+                // Action or Safety Card
+                lastIntent?.let { intent ->
+                    Spacer(modifier = Modifier.height(16.dp))
+                    if (intent.requiresSafetyPause) {
+                        SafetyGateCard(
+                            reason = intent.speechFeedback,
+                            onUserAuthorize = {}
+                        )
+                    } else {
+                        ActionCard(
+                            intent = intent,
+                            isNativeApp = isLastNativeApp,
+                            statusText = intent.speechFeedback
                         )
                     }
                 }
             }
 
-            // Action Result Card
-            lastIntent?.let { intent ->
-                if (intent.requiresSafetyPause) {
-                    SafetyGateCard(
-                        reason = intent.speechFeedback,
-                        onUserAuthorize = { /* Handled safely */ }
+            // BOTTOM DOCK (From reference design)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
+                    .background(Color(0xFFF8FAFC))
+                    .border(1.dp, HairlineBorder, RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp))
+                    .padding(horizontal = 24.dp, vertical = 18.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    // Left: Chat Toggle Button
+                    Box(
+                        modifier = Modifier
+                            .size(46.dp)
+                            .clip(CircleShape)
+                            .background(CanvasWhite)
+                            .border(1.dp, HairlineBorder, CircleShape)
+                            .clickable { isChatView = true },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ChatBubbleOutline,
+                            contentDescription = "Chat",
+                            tint = SlateDark,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    // Center: Black Elevated Hydrogen Mic Button
+                    HydrogenMicButton(
+                        isListening = isListening,
+                        onClick = onMicClick
                     )
-                } else {
+
+                    // Right: Close Button
+                    Box(
+                        modifier = Modifier
+                            .size(46.dp)
+                            .clip(CircleShape)
+                            .background(CanvasWhite)
+                            .border(1.dp, HairlineBorder, CircleShape)
+                            .clickable {
+                                // Reset view or cancel
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Cancel",
+                            tint = SlateDark,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+        } else {
+            // ==================== MODE 2: AI ASK / PRODUCT CURATION (SCREEN 3) ====================
+            Column(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Spacer(modifier = Modifier.height(12.dp))
+
+                // Bot Greeting Bubble
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(Color(0xFFF8FAFC))
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                ) {
+                    Text(
+                        text = "What's Your Shopping Mood Today?",
+                        fontSize = 15.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = SlateDark
+                    )
+                }
+
+                // Category Filter Pills
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(moodCategories) { cat ->
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(Color(0xFFF8FAFC))
+                                .border(1.dp, HairlineBorder, RoundedCornerShape(20.dp))
+                                .clickable { onQuickCommandClick("Amazon pe $cat search karo") }
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                        ) {
+                            Text(
+                                text = cat,
+                                fontSize = 13.sp,
+                                color = SlateDark
+                            )
+                        }
+                    }
+                }
+
+                // User Request Bubble (If query available)
+                if (transcriptText.isNotBlank()) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(Color(0xFF111215))
+                                .padding(horizontal = 16.dp, vertical = 12.dp)
+                        ) {
+                            Text(
+                                text = transcriptText,
+                                fontSize = 14.sp,
+                                color = Color.White
+                            )
+                        }
+                    }
+                }
+
+                // AI Curated Products Header
+                Text(
+                    text = "AI-Curated Finds Based On Your Mood",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = SlateMuted
+                )
+
+                // 2-Column Product Cards Grid
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    curatedProducts.forEach { product ->
+                        Box(modifier = Modifier.weight(1f)) {
+                            ProductCard(
+                                product = product,
+                                onClick = { onQuickCommandClick("Amazon pe ${product.title} search karo") }
+                            )
+                        }
+                    }
+                }
+
+                lastIntent?.let { intent ->
                     ActionCard(
                         intent = intent,
                         isNativeApp = isLastNativeApp,
@@ -224,57 +404,72 @@ fun HomeScreen(
                 }
             }
 
-            // Quick Example Command Chips
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+            // BOTTOM PILL INPUT BAR (Screen 3 Bottom)
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
             ) {
-                Text(
-                    text = "TRY ASKING",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = SlateMuted
-                )
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(Color(0xFFF8FAFC))
+                        .border(1.dp, HairlineBorder, RoundedCornerShape(28.dp))
+                        .padding(horizontal = 14.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    items(quickSuggestions) { suggestion ->
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(SurfacePearl)
-                                .border(1.dp, HairlineBorder, RoundedCornerShape(14.dp))
-                                .clickable { onQuickCommandClick(suggestion) }
-                                .padding(horizontal = 12.dp, vertical = 8.dp)
-                        ) {
-                            Text(
-                                text = suggestion,
-                                fontSize = 12.sp,
-                                color = SlateSecondary
-                            )
+                    Icon(
+                        imageVector = Icons.Default.CameraAlt,
+                        contentDescription = "Camera",
+                        tint = SlateMuted,
+                        modifier = Modifier.size(20.dp)
+                    )
+
+                    Spacer(modifier = Modifier.width(10.dp))
+
+                    Icon(
+                        imageVector = Icons.Default.Mic,
+                        contentDescription = "Voice",
+                        tint = SlateMuted,
+                        modifier = Modifier
+                            .size(20.dp)
+                            .clickable { onMicClick() }
+                    )
+
+                    Spacer(modifier = Modifier.width(10.dp))
+
+                    OutlinedTextField(
+                        value = textInput,
+                        onValueChange = { textInput = it },
+                        placeholder = { Text("Type here…", fontSize = 14.sp, color = SlateMuted) },
+                        modifier = Modifier.weight(1f),
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color.Transparent,
+                            unfocusedBorderColor = Color.Transparent,
+                            focusedContainerColor = Color.Transparent,
+                            unfocusedContainerColor = Color.Transparent
+                        )
+                    )
+
+                    IconButton(
+                        onClick = {
+                            if (textInput.isNotBlank()) {
+                                onQuickCommandClick(textInput)
+                                textInput = ""
+                            }
                         }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Send,
+                            contentDescription = "Send",
+                            tint = Color(0xFF111215),
+                            modifier = Modifier.size(20.dp)
+                        )
                     }
                 }
             }
-        }
-
-        // BOTTOM HERO: Minimalist White Hydrogen Mic Button
-        Column(
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp),
-            modifier = Modifier.padding(bottom = 8.dp)
-        ) {
-            HydrogenMicButton(
-                isListening = isListening,
-                onClick = onMicClick
-            )
-
-            Text(
-                text = if (isListening) "Listening in Hindi & English…" else "Tap button to speak",
-                fontSize = 13.sp,
-                fontWeight = FontWeight.Medium,
-                color = if (isListening) HydrogenBlue else SlateMuted
-            )
         }
     }
 }

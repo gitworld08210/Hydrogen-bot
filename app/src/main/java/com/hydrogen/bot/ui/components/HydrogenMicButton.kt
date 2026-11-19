@@ -25,71 +25,56 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.hydrogen.bot.ui.theme.CanvasWhite
-import com.hydrogen.bot.ui.theme.HairlineBorder
-import com.hydrogen.bot.ui.theme.HydrogenBlue
-import com.hydrogen.bot.ui.theme.HydrogenSoftRing
 
+/**
+ * Redesigned to exactly match the reference design:
+ * Dark obsidian circle, crisp white icon, soft diffused outer halo.
+ */
 @Composable
 fun HydrogenMicButton(
     isListening: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Subtle Gentle Breathing Ring (NO harsh neon)
-    val infiniteTransition = rememberInfiniteTransition(label = "gentleBreath")
-    val pulseScale by infiniteTransition.animateFloat(
+    val infiniteTransition = rememberInfiniteTransition(label = "micHalo")
+    val haloScale by infiniteTransition.animateFloat(
         initialValue = 1.0f,
-        targetValue = if (isListening) 1.22f else 1.0f,
+        targetValue = if (isListening) 1.25f else 1.05f,
         animationSpec = infiniteRepeatable(
             animation = tween(1200, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "pulseScale"
-    )
-    val pulseAlpha by infiniteTransition.animateFloat(
-        initialValue = 0.4f,
-        targetValue = if (isListening) 0.08f else 0.0f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1200, easing = FastOutSlowInEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "pulseAlpha"
+        label = "haloScale"
     )
 
     Box(
         contentAlignment = Alignment.Center,
-        modifier = modifier.size(108.dp)
+        modifier = modifier.size(100.dp)
     ) {
-        // Soft outer subtle breathing ring
-        if (isListening) {
-            Box(
-                modifier = Modifier
-                    .size(92.dp)
-                    .scale(pulseScale)
-                    .clip(CircleShape)
-                    .background(HydrogenSoftRing.copy(alpha = pulseAlpha))
-            )
-        }
+        // Outer diffused soft halo ring (from reference image)
+        Box(
+            modifier = Modifier
+                .size(86.dp)
+                .scale(if (isListening) haloScale else 1f)
+                .clip(CircleShape)
+                .background(Color(0xFFE2E8F0).copy(alpha = if (isListening) 0.6f else 0.4f))
+                .border(1.dp, Color(0xFFCBD5E1).copy(alpha = 0.5f), CircleShape)
+        )
 
-        // Pure Minimal White Elevated Button (Apple / Stripe style)
+        // Center Deep Obsidian Button
         Box(
             contentAlignment = Alignment.Center,
             modifier = Modifier
-                .size(76.dp)
+                .size(64.dp)
                 .shadow(
-                    elevation = if (isListening) 8.dp else 4.dp,
+                    elevation = if (isListening) 12.dp else 6.dp,
                     shape = CircleShape,
-                    spotColor = HydrogenBlue.copy(alpha = 0.15f)
+                    spotColor = Color.Black.copy(alpha = 0.35f)
                 )
                 .clip(CircleShape)
-                .background(CanvasWhite)
-                .border(
-                    width = 1.dp,
-                    color = if (isListening) HydrogenBlue else HairlineBorder,
-                    shape = CircleShape
-                )
+                .background(Color(0xFF111215)) // Pure obsidian black
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
@@ -99,8 +84,8 @@ fun HydrogenMicButton(
             Icon(
                 imageVector = if (isListening) Icons.Default.Stop else Icons.Default.Mic,
                 contentDescription = "Voice Input",
-                tint = if (isListening) HydrogenBlue else HydrogenBlue.copy(alpha = 0.85f),
-                modifier = Modifier.size(32.dp)
+                tint = Color.White,
+                modifier = Modifier.size(26.dp)
             )
         }
     }
