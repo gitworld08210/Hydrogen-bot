@@ -5,6 +5,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.net.Uri
 import android.os.BatteryManager
 import android.os.Bundle
 import android.speech.RecognizerIntent
@@ -81,14 +83,53 @@ class MainActivity : FragmentActivity(), VoiceListener {
         }
     }
 
+    // Camera Permission Request Handler
+    private val requestCameraPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            safeLaunchCamera()
+        } else {
+            Toast.makeText(this, "Camera permission allow kijiye photo scan ke liye.", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    // Gallery / Photo Picker Launcher
+    private val pickImageLauncher = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                contentResolver.openInputStream(uri)?.use { stream ->
+                    val bitmap = BitmapFactory.decodeStream(stream)
+                    if (bitmap != null) {
+                        analyzePhotoWithGemini(bitmap)
+                    } else {
+                        Toast.makeText(this, "Photo load nahi ho paayi.", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            } catch (e: Exception) {
+                Toast.makeText(this, "Photo decode error: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     // Gemini Multimodal Camera Vision Launcher
     private val takePicturePreviewLauncher = registerForActivityResult(
         ActivityResultContracts.TakePicturePreview()
     ) { bitmap: Bitmap? ->
         if (bitmap != null) {
-            statusText = "Analyzing photo with Gemini Vision…"
-            ttsManager.speak("Photo scan ho rahi hai, ek second.")
-            lifecycleScope.launch {
+            analyzePhotoWithGemini(bitmap)
+        } else {
+            statusText = "Photo capture cancel hua."
+        }
+    }
+
+    private fun analyzePhotoWithGemini(bitmap: Bitmap) {
+        statusText = "Analyzing photo with Gemini Vision…"
+        ttsManager.speak("Photo scan ho rahi hai, ek second.")
+        lifecycleScope.launch {
+            try {
                 val res = intentParser.analyzeImage(bitmap)
                 visionResult = res
                 if (res != null) {
@@ -98,7 +139,43 @@ class MainActivity : FragmentActivity(), VoiceListener {
                     statusText = "Product pehchaan nahi paaye."
                     ttsManager.speak("Product pehchaan nahi paaye. Kripya dobara try karein.")
                 }
+            } catch (e: Exception) {
+                statusText = "Vision analyze error: ${e.localizedMessage}"
+                ttsManager.speak("Photo scan me dikkat aayi.")
             }
+        }
+    }
+
+    private fun openCameraLens() {
+        try {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
+                safeLaunchCamera()
+            } else {
+                requestCameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+            }
+        } catch (e: Exception) {
+            safeLaunchCamera()
+        }
+    }
+
+    private fun safeLaunchCamera() {
+        try {
+            takePicturePreviewLauncher.launch(null)
+        } catch (e: Exception) {
+            Toast.makeText(this, "Camera open karne me dikkat aayi. Gallery se select karein.", Toast.LENGTH_SHORT).show()
+            try {
+                pickImageLauncher.launch("image/*")
+            } catch (e2: Exception) {
+                Toast.makeText(this, "Camera intent unavailable: ${e.localizedMessage}", Toast.LENGTH_LONG).show()
+            }
+        }
+    }
+
+    private fun openGalleryPicker() {
+        try {
+            pickImageLauncher.launch("image/*")
+        } catch (e: Exception) {
+            Toast.makeText(this, "Gallery open nahi ho paayi: ${e.localizedMessage}", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -167,7 +244,8 @@ class MainActivity : FragmentActivity(), VoiceListener {
                             userEmail = authManager.currentUser.email.ifEmpty { "User" },
                             visionResult = visionResult,
                             onMicClick = { toggleListening() },
-                            onOpenVision = { takePicturePreviewLauncher.launch(null) },
+                            onOpenVision = { openCameraLens() },
+                            onPickGallery = { openGalleryPicker() },
                             onClearVision = { visionResult = null },
                             onSearchAmazon = { query ->
                                 AppRouter.launchAmazonSearch(this@MainActivity, query)
@@ -274,7 +352,7 @@ class MainActivity : FragmentActivity(), VoiceListener {
                 }
                 ActionType.CAMERA_VISION -> {
                     ttsManager.speak(intent.speechFeedback)
-                    takePicturePreviewLauncher.launch(null)
+                    openCameraLens()
                     isLastNativeApp = false
                 }
                 ActionType.BOOK_TICKET_IRCTC -> {

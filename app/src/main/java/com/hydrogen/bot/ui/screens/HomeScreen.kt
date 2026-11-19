@@ -31,15 +31,18 @@ import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.ShoppingBag
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -81,6 +84,7 @@ fun HomeScreen(
     onOpenVault: () -> Unit,
     onQuickCommandClick: (String) -> Unit,
     onOpenVision: () -> Unit = {},
+    onPickGallery: () -> Unit = {},
     visionResult: VisionResult? = null,
     onClearVision: () -> Unit = {},
     onSearchAmazon: (String) -> Unit = {},
@@ -90,12 +94,79 @@ fun HomeScreen(
     // Mode toggle between "Voice Chat" (Middle Screen) and "AI Ask" (Right Screen)
     var isChatView by remember { mutableStateOf(false) }
     var textInput by remember { mutableStateOf("") }
+    var showPhotoChooser by remember { mutableStateOf(false) }
 
     val moodCategories = listOf("Shoes", "Electronics", "Mobiles", "Watches", "Deals")
     val curatedProducts = listOf(
         ProductItem("1", "Running Shoes Elite", "₹1,499.00", "15% Off", "Amazon"),
         ProductItem("2", "Wireless Earbuds Pro", "₹999.00", "20% Off", "Amazon")
     )
+
+    if (showPhotoChooser) {
+        AlertDialog(
+            onDismissRequest = { showPhotoChooser = false },
+            title = {
+                Text(
+                    text = "Gemini Vision Lens",
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp,
+                    color = SlateDark
+                )
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "Photo scan karne ke liye option chunein:",
+                        fontSize = 14.sp,
+                        color = SlateDark
+                    )
+
+                    // Option 1: Live Camera
+                    Button(
+                        onClick = {
+                            showPhotoChooser = false
+                            onOpenVision()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColors(containerColor = SlateDark),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PhotoCamera,
+                            contentDescription = null,
+                            tint = CanvasWhite,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("📷 Camera se Photo Lein", color = CanvasWhite, fontWeight = FontWeight.Medium)
+                    }
+
+                    // Option 2: Gallery / Files
+                    OutlinedButton(
+                        onClick = {
+                            showPhotoChooser = false
+                            onPickGallery()
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text("🖼️ Gallery / Screenshots se Chunein", color = SlateDark, fontWeight = FontWeight.Medium)
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showPhotoChooser = false }) {
+                    Text("Cancel", color = SlateDark)
+                }
+            },
+            containerColor = CanvasWhite,
+            shape = RoundedCornerShape(16.dp)
+        )
+    }
 
     Column(
         modifier = modifier
@@ -151,7 +222,7 @@ fun HomeScreen(
                         .clip(CircleShape)
                         .background(Color(0xFFF8FAFC))
                         .border(1.dp, HairlineBorder, CircleShape)
-                        .clickable { onOpenVision() },
+                        .clickable { showPhotoChooser = true },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -422,7 +493,7 @@ fun HomeScreen(
                             .clip(CircleShape)
                             .background(CanvasWhite)
                             .border(1.dp, HairlineBorder, CircleShape)
-                            .clickable { onOpenVision() },
+                            .clickable { showPhotoChooser = true },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
@@ -528,7 +599,7 @@ fun HomeScreen(
                                 .clickable {
                                     val query = when {
                                         action.contains("Good Morning") -> "Good morning"
-                                        action.contains("Photo Scan") -> { onOpenVision(); return@clickable }
+                                        action.contains("Photo Scan") -> { showPhotoChooser = true; return@clickable }
                                         action.contains("Battery") -> "battery check"
                                         action.contains("Shoes") -> "Amazon pe running shoes"
                                         action.contains("Songs") -> "YouTube pe Arijit Singh gaane"
