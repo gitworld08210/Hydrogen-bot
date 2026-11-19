@@ -13,6 +13,7 @@ object PackageRegistry {
 
     // WhatsApp
     const val WHATSAPP_PACKAGE = "com.whatsapp"
+    const val WHATSAPP_BUSINESS_PACKAGE = "com.whatsapp.w4b"
 
     // Quick Commerce & Travel
     const val BLINKIT_PACKAGE = "com.grofers.customerapp"

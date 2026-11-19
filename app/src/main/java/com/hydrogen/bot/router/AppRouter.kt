@@ -527,8 +527,15 @@ object AppRouter {
         val pm = context.packageManager
         val cleanName = appName.trim().lowercase()
 
+        // Special case: WhatsApp
+        if (cleanName.contains("whatsapp") || cleanName.contains("whats app") || cleanName.contains("व्हाट्सएप") || cleanName.contains("व्हाट्सऐप")) {
+            return launchWhatsApp(context, "")
+        }
+
         // 1. Direct package map for top popular apps in India
         val knownPackages = mapOf(
+            "whatsapp" to listOf(PackageRegistry.WHATSAPP_PACKAGE, PackageRegistry.WHATSAPP_BUSINESS_PACKAGE),
+            "whats app" to listOf(PackageRegistry.WHATSAPP_PACKAGE, PackageRegistry.WHATSAPP_BUSINESS_PACKAGE),
             "instagram" to listOf("com.instagram.android"),
             "spotify" to listOf("com.spotify.music"),
             "zomato" to listOf("com.application.zomato"),

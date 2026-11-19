@@ -82,6 +82,7 @@ class MainActivity : FragmentActivity(), VoiceListener {
     private var isNotificationAccessGranted by mutableStateOf(false)
     private var incomingChat by mutableStateOf<IncomingChat?>(null)
     private var personaProfile by mutableStateOf<ChatPersona?>(null)
+    private var isAwaitingWhatsAppAction by mutableStateOf(false)
 
     // Chat Export File Picker Launcher (.txt from WhatsApp or Instagram)
     private val chatFilePickerLauncher = registerForActivityResult(
@@ -425,7 +426,7 @@ class MainActivity : FragmentActivity(), VoiceListener {
         statusText = "Hermes Cloud Brain is reasoning…"
         lifecycleScope.launch {
             val memoryContext = memoryManager.getRecentMemoryContext()
-            val intent = intentParser.parse(spokenText, visionResult?.productName, memoryContext)
+            val intent = intentParser.parse(spokenText, visionResult?.productName, memoryContext, isAwaitingWhatsAppAction)
             lastIntent = intent
             statusText = intent.speechFeedback
 
@@ -444,6 +445,7 @@ class MainActivity : FragmentActivity(), VoiceListener {
             // Autonomous Action Execution Engine
             when (intent.action) {
                 ActionType.SEARCH_AMAZON -> {
+                    isAwaitingWhatsAppAction = false
                     speak(intent.speechFeedback)
                     val result = AppRouter.launchAmazonSearch(this@MainActivity, intent.query)
                     isLastNativeApp = result.isNativeApp
@@ -452,16 +454,19 @@ class MainActivity : FragmentActivity(), VoiceListener {
                     }
                 }
                 ActionType.SEARCH_YOUTUBE -> {
+                    isAwaitingWhatsAppAction = false
                     speak(intent.speechFeedback)
                     val result = AppRouter.launchYouTubeSearch(this@MainActivity, intent.query)
                     isLastNativeApp = result.isNativeApp
                 }
                 ActionType.SEARCH_FLIPKART -> {
+                    isAwaitingWhatsAppAction = false
                     speak(intent.speechFeedback)
                     val result = AppRouter.launchFlipkartSearch(this@MainActivity, intent.query)
                     isLastNativeApp = result.isNativeApp
                 }
                 ActionType.SEARCH_BLINKIT, ActionType.QUICK_CART_BLINKIT -> {
+                    isAwaitingWhatsAppAction = false
                     speak(intent.speechFeedback)
                     val result = AppRouter.launchBlinkitSearch(this@MainActivity, intent.query)
                     isLastNativeApp = result.isNativeApp
@@ -470,6 +475,7 @@ class MainActivity : FragmentActivity(), VoiceListener {
                     }
                 }
                 ActionType.SEARCH_GOOGLE -> {
+                    isAwaitingWhatsAppAction = false
                     speak(intent.speechFeedback)
                     val result = AppRouter.launchGoogleSearch(this@MainActivity, intent.query)
                     isLastNativeApp = result.isNativeApp
@@ -478,6 +484,7 @@ class MainActivity : FragmentActivity(), VoiceListener {
                     }
                 }
                 ActionType.SEND_WHATSAPP -> {
+                    isAwaitingWhatsAppAction = false
                     speak(intent.speechFeedback)
                     val isContextual = intent.details["contextual"] == "true"
                     val contactName = intent.details["contact"] ?: ""
@@ -496,6 +503,11 @@ class MainActivity : FragmentActivity(), VoiceListener {
                         val phoneNumber = if (contactName.isNotBlank()) {
                             ContactLookupHelper.findPhoneNumberByName(this@MainActivity, contactName)
                         } else null
+
+                        // If phone number not found in device contacts, arm accessibility search for the contact name!
+                        if (phoneNumber == null && contactName.isNotBlank()) {
+                            HydrogenAccessibilityService.armSearch(contactName)
+                        }
 
                         // Arms accessibility service to auto-tap Send button once WhatsApp opens!
                         HydrogenAccessibilityService.armAutoSend(true)
@@ -644,23 +656,37 @@ class MainActivity : FragmentActivity(), VoiceListener {
                     isLastNativeApp = true
                 }
                 ActionType.OPEN_APP -> {
-                    val keepListening = intent.details["keepListening"] == "true"
-                    val result = AppRouter.launchAppByName(this@MainActivity, intent.targetApp)
-                    isLastNativeApp = result.isNativeApp
-                    if (!result.success) {
-                        Toast.makeText(this@MainActivity, result.message, Toast.LENGTH_LONG).show()
-                    }
-                    speak(intent.speechFeedback) {
-                        if (keepListening && isVoiceInput) {
-                            // Shilex JARVIS behavior: Keep mic open & listening over the opened app!
-                            lifecycleScope.launch {
-                                kotlinx.coroutines.delay(400)
-                                voiceManager.startListening()
+                    if (intent.targetApp.equals("WhatsApp", ignoreCase = true)) {
+                        val directLaunch = intent.details["directLaunch"] == "true"
+                        if (directLaunch) {
+                            isAwaitingWhatsAppAction = false
+                            speak(intent.speechFeedback)
+                            AppRouter.launchWhatsApp(this@MainActivity, "")
+                        } else {
+                            // Conversational Flow (inspired by Shilex JARVIS):
+                            // Do NOT minimize or abandon Hydrogen Bot! Stay in foreground so Android mic never dies!
+                            isAwaitingWhatsAppAction = true
+                            statusText = intent.speechFeedback
+                            speak(intent.speechFeedback) {
+                                lifecycleScope.launch {
+                                    kotlinx.coroutines.delay(200)
+                                    safeStartListening()
+                                }
                             }
                         }
+                    } else {
+                        isAwaitingWhatsAppAction = false
+                        val result = AppRouter.launchAppByName(this@MainActivity, intent.targetApp)
+                        isLastNativeApp = result.isNativeApp
+                        if (!result.success) {
+                            Toast.makeText(this@MainActivity, result.message, Toast.LENGTH_LONG).show()
+                        }
+                        speak(intent.speechFeedback)
                     }
                 }
                 ActionType.UNIVERSAL_SEARCH -> {
+                    isAwaitingWhatsAppAction = false
+                    speak(intent.speechFeedback)
                     if (intent.targetApp.equals("WhatsApp", ignoreCase = true)) {
                         HydrogenAccessibilityService.armSearch(intent.query)
                         AppRouter.launchWhatsApp(this@MainActivity, "")
@@ -671,7 +697,6 @@ class MainActivity : FragmentActivity(), VoiceListener {
                             Toast.makeText(this@MainActivity, result.message, Toast.LENGTH_LONG).show()
                         }
                     }
-                    speak(intent.speechFeedback)
                 }
                 ActionType.SET_ALARM -> {
                     val result = AppRouter.launchSetAlarm(this@MainActivity, intent.query.ifBlank { spokenText })

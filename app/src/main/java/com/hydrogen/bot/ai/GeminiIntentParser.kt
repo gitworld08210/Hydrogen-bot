@@ -49,7 +49,8 @@ class GeminiIntentParser(
     suspend fun parse(
         spokenText: String,
         contextProduct: String? = null,
-        memoryContext: String? = null
+        memoryContext: String? = null,
+        isAwaitingWhatsApp: Boolean = false
     ): ParsedIntent = withContext(Dispatchers.Default) {
         var cleanText = spokenText.trim().lowercase()
 
@@ -64,7 +65,7 @@ class GeminiIntentParser(
         }
 
         // 1. FAST LOCAL RULE ENGINE (Hindi Devanagari & English/Hinglish)
-        val offlineIntent = parseOfflineRules(cleanText, spokenText, contextProduct)
+        val offlineIntent = parseOfflineRules(cleanText, spokenText, contextProduct, isAwaitingWhatsApp)
         if (offlineIntent != null) {
             return@withContext offlineIntent
         }
@@ -116,6 +117,8 @@ class GeminiIntentParser(
      * (the Mark-LVII principle: the LLM judges, keywords don't decide).
      */
     private fun hasNegation(clean: String): Boolean {
+        // "kuch nahi bas kholo" is NOT a negation of command
+        if (clean.contains("kuch nahi") || clean.contains("kuch nhi")) return false
         return clean.contains("नहीं") || clean.contains("नही") ||
             clean.contains("nahi") || clean.contains("nahin") ||
             clean.contains("मत") || clean.contains(" mat ") ||
@@ -144,51 +147,37 @@ class GeminiIntentParser(
         }
     }
 
-    private fun parseOfflineRules(clean: String, original: String, contextProduct: String? = null): ParsedIntent? {
+    private fun parseOfflineRules(
+        clean: String,
+        original: String,
+        contextProduct: String? = null,
+        isAwaitingWhatsApp: Boolean = false
+    ): ParsedIntent? {
         // "यूट्यूब देखा नहीं" is a statement, not a command — skip every
         // keyword rule so Gemini / the conversational fallback answers it.
         if (hasNegation(clean)) return null
 
-        // 1. PURE APP LAUNCH (Priority 1: Matches "open whatsapp", "whatsapp kholo", "open youtube", etc.)
-        val isWhatsAppOpen = clean == "open whatsapp" || clean == "whatsapp open" ||
-            clean == "whatsapp kholo" || clean == "whatsapp open karo" || clean == "whatsapp chalu karo" || clean == "whatsapp khol" ||
-            clean == "open whats app" || clean == "whats app open" || clean == "whats app kholo" ||
-            clean == "व्हाट्सएप खोलो" || clean == "व्हाट्सएप ओपन" || clean == "व्हाट्सएप चालू करो" ||
-            clean == "ओपन व्हाट्सएप" || clean == "व्हाट्सऐप खोलो" || clean == "व्हाट्सऐप ओपन" || clean == "ओपन व्हाट्सऐप"
-        if (isWhatsAppOpen) {
+        // 0. Permission / Android Block Reassurance (fixes hallucination about Android not allowing launch)
+        if (clean.contains("kholne nahi") || clean.contains("permission") || clean.contains("nahi khul raha") || clean.contains("nahi de raha")) {
             return ParsedIntent(
-                action = ActionType.OPEN_APP,
-                targetApp = "WhatsApp",
+                action = ActionType.GENERAL_QUERY,
+                targetApp = "Hydrogen Assistant",
                 query = "",
-                speechFeedback = "WhatsApp khol diya hai. Kisko message bhejna hai ya search karna hai?",
-                details = mapOf("keepListening" to "true")
+                speechFeedback = "Permissions fully granted hain! Boliye: 'WhatsApp kholo', 'Vishnu ko hi bhejo', ya 'Minnu search karo' aur main turant kar doonga."
             )
         }
 
-        // Generic App Launch: "open [app]" or "[app] kholo / open"
-        val appLaunchRegexA = Regex("^(?:open|launch|kholo|khol|chalu karo|start)\\s+([a-zA-Z0-9\\u0900-\\u097F\\s]+)$")
-        val appLaunchRegexB = Regex("^([a-zA-Z0-9\\u0900-\\u097F\\s]+?)\\s+(?:open|kholo|khol|chalu karo|chalao|start|launch)$")
-        val appLaunchMatch = appLaunchRegexA.find(clean) ?: appLaunchRegexB.find(clean)
-        if (appLaunchMatch != null) {
-            val appRaw = appLaunchMatch.groupValues[1].trim()
-            val targetApp = resolveKnownAppName(appRaw)
-            if (targetApp != null) {
-                return ParsedIntent(
-                    action = ActionType.OPEN_APP,
-                    targetApp = targetApp,
-                    query = "",
-                    speechFeedback = "$targetApp open kar diya hai.",
-                    details = mapOf("keepListening" to "true")
-                )
-            }
-        }
+        val mentionsWhatsApp = clean.contains("whatsapp") || clean.contains("whats app") || clean.contains("व्हाट्सएप") || clean.contains("व्हाट्सऐप")
 
-        // 2. IN-APP SEARCH (e.g. "search karo Minnu whatsapp pe", "whatsapp pe search karo Minnu")
-        if ((clean.contains("whatsapp") || clean.contains("व्हाट्सएप")) &&
-            (clean.contains("search") || clean.contains("dhoondo") || clean.contains("dhundo") || clean.contains("खोजो") || clean.contains("ढूंढो") || clean.contains("सर्च"))) {
+        // 1. WhatsApp In-App Search (Priority 1: "search karo Vishnu", "search karo Minnu", "Minnu search karo", "Vishnu search karo")
+        val isSearchPhrase = clean.contains("search") || clean.contains("dhoondo") || clean.contains("dhundo") ||
+            clean.contains("khojo") || clean.contains("खोजो") || clean.contains("ढूंढो") || clean.contains("सर्च")
+
+        if (isSearchPhrase && (isAwaitingWhatsApp || mentionsWhatsApp)) {
             val q = clean
                 .replace("search karo", "").replace("search", "").replace("सर्च करो", "").replace("सर्च", "")
                 .replace("whatsapp pe", "").replace("whatsapp par", "").replace("whatsapp me", "").replace("whatsapp", "")
+                .replace("whats app pe", "").replace("whats app par", "").replace("whats app me", "").replace("whats app", "")
                 .replace("व्हाट्सएप पे", "").replace("व्हाट्सएप पर", "").replace("व्हाट्सएप", "").replace("व्हाट्सऐप", "")
                 .replace("dhoondo", "").replace("dhundo", "").replace("khojo", "").replace("खोजो", "").replace("ढूंढो", "")
                 .replace("mere liye", "").replace("please", "").replace("karo", "").replace("kar do", "").trim()
@@ -202,7 +191,50 @@ class GeminiIntentParser(
             }
         }
 
-        // 3. CONTEXTUAL MESSAGE SEND (e.g. "esko hi bhejo", "inhe hi bhejo", "esko message bhejo hi")
+        // 2. Direct Message Sending to Contacts (Priority 2)
+        // Matches: "send karo hi vishnu ko", "send karo hi vshn ko", "vishu ko hi send karo", "vishnu ko hi bhejo", "vishnu ko bolo hello"
+        val cleanNoWa = clean
+            .replace("whatsapp pe", "").replace("whatsapp par", "").replace("whatsapp me", "").replace("whatsapp", "")
+            .replace("whats app pe", "").replace("whats app par", "").replace("whats app me", "").replace("whats app", "")
+            .replace("व्हाट्सएप पे", "").replace("व्हाट्सएप पर", "").replace("व्हाट्सएप", "").replace("व्हाट्सऐप", "")
+            .trim()
+
+        val sendRegex1 = Regex("^(?:send karo|send|bhejo|bhej do)\\s+(.+?)\\s+([a-zA-Z0-9\\u0900-\\u097F]+)\\s*(?:ko|k pass|ke pass|ke paas)$")
+        val matchSend1 = sendRegex1.find(cleanNoWa)
+
+        val sendRegex2 = Regex("^([a-zA-Z0-9\\u0900-\\u097F]+)\\s*(?:ko|k pass|ke pass|ke paas)\\s*(?:bolo|message bhejo|message karo|message)?\\s*(.+?)\\s*(?:send karo|bhejo|bhej do|send|karo)?$")
+        val matchSend2 = if (matchSend1 == null) sendRegex2.find(cleanNoWa) else null
+
+        if (matchSend1 != null) {
+            val msg = matchSend1.groupValues[1].trim()
+            val contact = matchSend1.groupValues[2].trim()
+            if (contact.isNotBlank() && msg.isNotBlank()) {
+                return ParsedIntent(
+                    action = ActionType.SEND_WHATSAPP,
+                    targetApp = "WhatsApp",
+                    query = msg,
+                    speechFeedback = "${contact.replaceFirstChar { it.uppercase() }} ko '$msg' bhej raha hoon.",
+                    details = mapOf("contact" to contact, "message" to msg)
+                )
+            }
+        } else if (matchSend2 != null) {
+            val contact = matchSend2.groupValues[1].trim()
+            var msg = matchSend2.groupValues[2].trim()
+            msg = msg.removePrefix("ki ").removePrefix("message ").trim()
+            val blockedWords = listOf("google", "youtube", "amazon", "flipkart", "blinkit", "mera", "meri", "phone", "app", "kuch")
+            if (contact.isNotBlank() && !blockedWords.contains(contact)) {
+                val finalMsg = if (msg.isBlank()) "Hi" else msg
+                return ParsedIntent(
+                    action = ActionType.SEND_WHATSAPP,
+                    targetApp = "WhatsApp",
+                    query = finalMsg,
+                    speechFeedback = "${contact.replaceFirstChar { it.uppercase() }} ko '$finalMsg' bhej raha hoon.",
+                    details = mapOf("contact" to contact, "message" to finalMsg)
+                )
+            }
+        }
+
+        // 3. Contextual Message Send ("esko hi bhejo", "isko message bhejo", "inhe bhejo")
         if (clean.startsWith("esko ") || clean.startsWith("isko ") || clean.startsWith("inhe ") ||
             clean.startsWith("isko message ") || clean.startsWith("esko message ")) {
             val msg = clean
@@ -212,13 +244,66 @@ class GeminiIntentParser(
                 .replace("भेजो", "").replace("लिखो", "").replace("टाइप करो", "")
                 .replace("bolo", "").replace("बोलो", "").replace("ki ", "")
                 .trim()
-            if (msg.isNotBlank()) {
-                return ParsedIntent(
-                    action = ActionType.SEND_WHATSAPP,
+            val finalMsg = if (msg.isBlank()) "Hi" else msg
+            return ParsedIntent(
+                action = ActionType.SEND_WHATSAPP,
+                targetApp = "WhatsApp",
+                query = finalMsg,
+                speechFeedback = "Message '$finalMsg' bhej raha hoon.",
+                details = mapOf("contextual" to "true", "message" to finalMsg)
+            )
+        }
+
+        // 4. Cancel / Just Open (e.g. "sirf kholo", "bas kholo", "sirf open karo", "bas open", "kuch nahi bas kholo", "sirf open")
+        val cancelOpenRegex = Regex("^(?:sirf kholo|bas kholo|sirf open karo|bas open|kuch nahi|kuch nahi bas kholo|sirf open|kholo)$")
+        if (cancelOpenRegex.matches(clean)) {
+            return ParsedIntent(
+                action = ActionType.OPEN_APP,
+                targetApp = "WhatsApp",
+                query = "",
+                speechFeedback = "WhatsApp open kar diya hai.",
+                details = mapOf("directLaunch" to "true")
+            )
+        }
+
+        // 5. WhatsApp Open (Conversational vs Direct)
+        // Matches: "open whatsapp", "whatsapp kholo", "open karo whatsapp", "whatsapp open karo",
+        // "khol do whatsapp", "whatsapp khol do", "whatsapp chalu karo", "whatsapp", "kholo whatsapp", etc.
+        if (mentionsWhatsApp) {
+            val isDirectLaunch = clean.contains("sirf") || clean.contains("bas") || clean.contains("direct")
+            return if (isDirectLaunch) {
+                ParsedIntent(
+                    action = ActionType.OPEN_APP,
                     targetApp = "WhatsApp",
-                    query = msg,
-                    speechFeedback = "Message '$msg' bhej raha hoon.",
-                    details = mapOf("contextual" to "true", "message" to msg)
+                    query = "",
+                    speechFeedback = "WhatsApp open kar diya hai.",
+                    details = mapOf("directLaunch" to "true")
+                )
+            } else {
+                ParsedIntent(
+                    action = ActionType.OPEN_APP,
+                    targetApp = "WhatsApp",
+                    query = "",
+                    speechFeedback = "WhatsApp ready hai. Kisko message bhejna hai ya kya search karna hai?",
+                    details = mapOf("keepListening" to "true", "promptWhatsApp" to "true")
+                )
+            }
+        }
+
+        // 6. Generic App Launch: "open [app]" or "[app] kholo / open"
+        val appLaunchRegexA = Regex("^(?:open|launch|kholo|khol|chalu karo|start)\\s+([a-zA-Z0-9\\u0900-\\u097F\\s]+)$")
+        val appLaunchRegexB = Regex("^([a-zA-Z0-9\\u0900-\\u097F\\s]+?)\\s+(?:open|kholo|khol|chalu karo|chalao|start|launch)$")
+        val appLaunchMatch = appLaunchRegexA.find(clean) ?: appLaunchRegexB.find(clean)
+        if (appLaunchMatch != null) {
+            val appRaw = appLaunchMatch.groupValues[1].trim()
+            val targetApp = resolveKnownAppName(appRaw)
+            if (targetApp != null) {
+                return ParsedIntent(
+                    action = ActionType.OPEN_APP,
+                    targetApp = targetApp,
+                    query = "",
+                    speechFeedback = "$targetApp open kar diya hai.",
+                    details = mapOf("keepListening" to "true")
                 )
             }
         }
