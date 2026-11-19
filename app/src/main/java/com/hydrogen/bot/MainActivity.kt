@@ -35,7 +35,7 @@ class MainActivity : FragmentActivity(), VoiceListener {
     private lateinit var ttsManager: TextToSpeechManager
     private lateinit var authManager: AuthManager
     private lateinit var vaultManager: EncryptedVaultManager
-    private val intentParser = GeminiIntentParser()
+    private val intentParser by lazy { GeminiIntentParser(BuildConfig.GEMINI_API_KEY) }
 
     // Observable UI State
     private var isListening by mutableStateOf(false)
