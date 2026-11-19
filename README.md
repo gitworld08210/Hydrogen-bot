@@ -6,17 +6,21 @@
 [![Backend: Supabase](https://img.shields.io/badge/Backend-Supabase_Postgres-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com)
 [![Auth: Supabase & Resend](https://img.shields.io/badge/Auth-Email_OTP-000000?style=for-the-badge&logo=resend&logoColor=white)](https://supabase.com)
 [![Notifications: Firebase FCM](https://img.shields.io/badge/Notifications-Firebase_FCM-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://firebase.google.com)
-[![Latest Release](https://img.shields.io/badge/Release-v1.2_Stable-0284C7?style=for-the-badge&logo=android&logoColor=white)](https://github.com/gitworld08210/Hydrogen-bot/raw/main/release/HydrogenBot-v1.2.apk)
+[![Latest Release](https://img.shields.io/badge/Release-v1.3_Stable-0284C7?style=for-the-badge&logo=android&logoColor=white)](https://github.com/gitworld08210/Hydrogen-bot/raw/main/release/HydrogenBot-v1.3.apk)
 
 ---
 
-## 📲 Direct APK Download (v1.2 - Latest Stable Release)
+## 📲 Direct APK Download (v1.3 - Mark-LVII Engine & Hindi Intent Fix)
 
 Aap seedha apne Android phone me latest signed APK download aur install kar sakte hain:
 
-👉 **[Download HydrogenBot-v1.2.apk (Direct Download)](https://github.com/gitworld08210/Hydrogen-bot/raw/main/release/HydrogenBot-v1.2.apk)** *(Size: ~13.9 MB)*
+👉 **[Download HydrogenBot-v1.3.apk (Direct Download)](https://github.com/gitworld08210/Hydrogen-bot/raw/main/release/HydrogenBot-v1.3.apk)** *(Size: ~13.9 MB)*
 
-### 🆕 What's New in v1.2:
+### 🆕 What's New in v1.3:
+* 🚀 **Mark-LVII Multi-Model Ladder (`GeminiIntentParser.kt`):** Upgraded to Mark-LVII's measured fast model ladder (`gemini-3.5-flash-lite` → `gemini-flash-lite-latest` → `gemini-3.8-flash`), delivering responses in under 0.6 seconds.
+* 🇮🇳 **Devanagari Hindi & Hinglish Offline Recognition:** Fixed the issue where speech recognized in Devanagari Hindi (e.g. `"यूट्यूब"`, `"अमेज़न"`, `"फ्लिपकार्ट"`, `"गाना"`) was not matching English keywords.
+* ⚡ **Instant Direct Native App Launch:** Saying just `"YouTube"` or `"यूट्यूब"` instantly launches the official YouTube app to its home feed, instead of falling back to robotic search text.
+* 💬 **Smart Conversational Intelligence:** For natural questions like *"Kaise ho tum?"*, the bot actually answers with friendly conversational Hindi instead of repeating *"Mai aapke liye dekh raha hu"*!
 * 📬 **Real Supabase Auth Email OTP Delivery:** Zero hardcoded demo codes. Real 6-digit OTPs are delivered directly to your Gmail inbox via Supabase Auth (`/auth/v1/otp`) and verified against `/auth/v1/verify`.
 * 🎙️ **Multi-Tier Robust Speech Recognizer Engine:** Fixed the OEM `"Voice recognition available nahi hai"` issue on Realme, Oppo, Xiaomi, and Samsung devices by implementing a 3-tier fallback (System Recognizer → Google Recognition Service Component → Direct Speech Engine) with Android 11+ `<queries>`.
 * 🎨 **Luxury Editorial Minimalist UI:** 
