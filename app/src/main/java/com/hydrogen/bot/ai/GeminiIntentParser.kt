@@ -283,18 +283,140 @@ class GeminiIntentParser(
             )
         }
 
-        // WhatsApp patterns (Hindi: व्हाट्सएप, व्हाट्सऐप, मैसेज | English: whatsapp, message)
+        // WhatsApp patterns (Hindi: व्हाट्सएप, व्हाट्सऐप, मैसेज, लिखो, बोलो | English: whatsapp, message, text)
         if (clean.contains("whatsapp") || clean.contains("व्हाट्सएप") || clean.contains("व्हाट्सऐप") ||
-            clean.contains("message bhejo") || clean.contains("मैसेज")) {
-            val query = extractQuery(clean, listOf(
-                "whatsapp pe", "whatsapp par", "whatsapp", "व्हाट्सएप पे", "व्हाट्सएप पर", "व्हाट्सएप", "व्हाट्सऐप",
-                "message bhejo", "bolo", "khol", "open", "मैसेज भेजो", "मैसेज"
-            ))
+            clean.contains("message bhejo") || clean.contains("मैसेज भेजो") || clean.contains("मैसेज") ||
+            clean.contains("likho") || clean.contains("लिखो") || clean.contains("type karo") || clean.contains("टाइप करो")) {
+
+            val messageKeywords = listOf(
+                "message type karo", "type karo", "likho", "bolo", "message bhejo", "message send karo",
+                "मैसेज टाइप करो", "टाइप करो", "लिखो", "बोलो", "मैसेज भेजो", "संदेश भेजो"
+            )
+
+            var extractedMsg = ""
+            for (kw in messageKeywords) {
+                if (clean.contains(kw)) {
+                    val parts = clean.split(kw, limit = 2)
+                    if (parts.size > 1 && parts[1].trim().isNotBlank()) {
+                        extractedMsg = parts[1].trim()
+                            .replace("mere liye", "")
+                            .replace("please", "")
+                            .replace("karo", "")
+                            .replace("kar do", "")
+                            .replace("dena", "")
+                            .trim()
+                        break
+                    }
+                }
+            }
+
+            if (extractedMsg.isBlank()) {
+                extractedMsg = extractQuery(clean, listOf(
+                    "whatsapp pe", "whatsapp par", "whatsapp me", "whatsapp", "व्हाट्सएप पे", "व्हाट्सएप पर", "व्हाट्सएप", "व्हाट्सऐप",
+                    "message bhejo", "message send karo", "message", "मैसेज भेजो", "मैसेज", "bolo", "khol", "open", "खोलो"
+                ))
+            }
+
+            val feedback = if (extractedMsg.isNotBlank()) {
+                "WhatsApp me '$extractedMsg' type kar diya hai."
+            } else {
+                "WhatsApp open kar raha hoon."
+            }
+
+            val plan = if (extractedMsg.isNotBlank()) {
+                AutonomousPlan(
+                    goal = "WhatsApp Message Auto-Type",
+                    cloudReasoning = "WhatsApp intent detected. Pre-filling '$extractedMsg' in draft box.",
+                    steps = listOf(
+                        AgentExecutionStep(1, "Parse Message Text", "Extracted text: '$extractedMsg'", true),
+                        AgentExecutionStep(2, "Launch WhatsApp Deep Link", "Opening WhatsApp with pre-filled message", true),
+                        AgentExecutionStep(3, "Sync to Supabase Memory", "Logged communication intent", true)
+                    ),
+                    autoTypeText = extractedMsg,
+                    targetApp = "WhatsApp",
+                    learnedFact = "User drafted WhatsApp message: '$extractedMsg'"
+                )
+            } else null
+
             return ParsedIntent(
                 action = ActionType.SEND_WHATSAPP,
                 targetApp = "WhatsApp",
-                query = query,
-                speechFeedback = "WhatsApp open kar raha hoon."
+                query = extractedMsg,
+                speechFeedback = feedback,
+                autonomousPlan = plan
+            )
+        }
+
+        // Smart Shopping & Budget Product Discovery (e.g. "500 under me batao sport shoes aacha", "1000 ke andar earbuds", "shoes chahiye")
+        val shoppingKeywords = listOf("shoes", "shoe", "जूते", "जूता", "sneakers", "phone", "mobile", "फोन", "मोबाइल", "earbuds", "headphones", "watch", "घड़ी", "tshirt", "jeans", "shirt", "pant", "bag", "laptop", "slipper", "chappal", "sandals")
+        val isShoppingItem = shoppingKeywords.any { clean.contains(it) }
+        val hasBudgetOrIntent = clean.contains("under") || clean.contains("अंदर") || clean.contains("batao") || clean.contains("बताओ") ||
+                                clean.contains("chahiye") || clean.contains("चाहिए") || clean.contains("dikhao") || clean.contains("दिखाओ") ||
+                                clean.contains("lena hai") || clean.contains("kharidna") || clean.contains("खरीदना") || clean.contains("achha") || clean.contains("अच्छा")
+
+        if (isShoppingItem && hasBudgetOrIntent) {
+            val budgetMatch = Regex("(\\d+)\\s*(?:under|me|ke andar|k andar|andar|tak)?").find(clean)
+            val budget = budgetMatch?.groupValues?.get(1)
+
+            var cleanItem = clean
+                .replace("batao", "")
+                .replace("बताओ", "")
+                .replace("aacha", "")
+                .replace("achha", "")
+                .replace("achhe", "")
+                .replace("अच्छा", "")
+                .replace("chahiye", "")
+                .replace("चाहिए", "")
+                .replace("dikhao", "")
+                .replace("दिखाओ", "")
+                .replace("lena hai", "")
+                .replace("kharidna hai", "")
+                .replace("kharidna", "")
+                .replace("under me", "")
+                .replace("ke andar", "")
+                .replace("andar", "")
+                .replace("under", "")
+                .replace("me", "")
+                .replace("pe", "")
+                .replace("par", "")
+                .trim()
+
+            val finalQuery = if (!budget.isNullOrBlank()) {
+                cleanItem.replace(budget, "").trim() + " under " + budget
+            } else {
+                cleanItem
+            }.trim().replace("\\s+".toRegex(), " ")
+
+            val speech = if (!budget.isNullOrBlank()) {
+                "₹$budget ke andar best options Amazon aur Flipkart par dhoondh raha hoon."
+            } else {
+                "Best $finalQuery Amazon aur Flipkart par dhoondh raha hoon."
+            }
+
+            val plan = AutonomousPlan(
+                goal = "E-Commerce Market Scan for '$finalQuery'",
+                cloudReasoning = "Hermes ne shopping query detect ki. Google search bypass karke direct Amazon aur Flipkart par '$finalQuery' compare kiya ja raha hai.",
+                priceComparisons = listOf(
+                    PriceComparisonItem("Amazon", if (!budget.isNullOrBlank()) "Under ₹$budget" else "Best Deals", "Best Price", finalQuery),
+                    PriceComparisonItem("Flipkart", if (!budget.isNullOrBlank()) "Under ₹$budget" else "In Stock", "Fast Delivery", finalQuery),
+                    PriceComparisonItem("Blinkit", "Instant", "10-Min Delivery", finalQuery)
+                ),
+                steps = listOf(
+                    AgentExecutionStep(1, "E-Commerce Intent Detection", "Identified shopping category with budget filter", true),
+                    AgentExecutionStep(2, "Clean Query Formulation", "Formulated '$finalQuery' (bypassing Google)", true),
+                    AgentExecutionStep(3, "Direct Marketplace Launch", "Opening Amazon India with filtered catalog", true)
+                ),
+                autoTypeText = finalQuery,
+                targetApp = "Amazon India",
+                learnedFact = "User searched for '$finalQuery'. Prefers direct e-commerce results."
+            )
+
+            return ParsedIntent(
+                action = ActionType.SEARCH_AMAZON,
+                targetApp = "Amazon India",
+                query = finalQuery,
+                speechFeedback = speech,
+                autonomousPlan = plan
             )
         }
 

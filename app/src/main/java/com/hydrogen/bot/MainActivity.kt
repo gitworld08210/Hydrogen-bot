@@ -280,7 +280,7 @@ class MainActivity : FragmentActivity(), VoiceListener {
                             },
                             onQuickCommandClick = { command ->
                                 transcriptText = command
-                                processSpokenCommand(command)
+                                processSpokenCommand(command, isVoiceInput = false)
                             }
                         )
                     }
@@ -313,7 +313,7 @@ class MainActivity : FragmentActivity(), VoiceListener {
         }
     }
 
-    private fun processSpokenCommand(spokenText: String) {
+    private fun processSpokenCommand(spokenText: String, isVoiceInput: Boolean = true) {
         statusText = "Hermes Cloud Brain is reasoning…"
         lifecycleScope.launch {
             val memoryContext = memoryManager.getRecentMemoryContext()
@@ -324,10 +324,17 @@ class MainActivity : FragmentActivity(), VoiceListener {
             // Autonomous Memory Sync: Saves task, plan, and learned preferences into Supabase PostgreSQL
             memoryManager.recordInteraction(authManager.currentUser.email, spokenText, intent)
 
+            // Voice response gate: speak only on voice input; stay silent in text chat mode
+            val speak: (String) -> Unit = { text ->
+                if (isVoiceInput) {
+                    ttsManager.speak(text)
+                }
+            }
+
             // Autonomous Action Execution Engine
             when (intent.action) {
                 ActionType.SEARCH_AMAZON -> {
-                    ttsManager.speak(intent.speechFeedback)
+                    speak(intent.speechFeedback)
                     val result = AppRouter.launchAmazonSearch(this@MainActivity, intent.query)
                     isLastNativeApp = result.isNativeApp
                     if (!result.success) {
@@ -335,17 +342,17 @@ class MainActivity : FragmentActivity(), VoiceListener {
                     }
                 }
                 ActionType.SEARCH_YOUTUBE -> {
-                    ttsManager.speak(intent.speechFeedback)
+                    speak(intent.speechFeedback)
                     val result = AppRouter.launchYouTubeSearch(this@MainActivity, intent.query)
                     isLastNativeApp = result.isNativeApp
                 }
                 ActionType.SEARCH_FLIPKART -> {
-                    ttsManager.speak(intent.speechFeedback)
+                    speak(intent.speechFeedback)
                     val result = AppRouter.launchFlipkartSearch(this@MainActivity, intent.query)
                     isLastNativeApp = result.isNativeApp
                 }
                 ActionType.SEARCH_BLINKIT, ActionType.QUICK_CART_BLINKIT -> {
-                    ttsManager.speak(intent.speechFeedback)
+                    speak(intent.speechFeedback)
                     val result = AppRouter.launchBlinkitSearch(this@MainActivity, intent.query)
                     isLastNativeApp = result.isNativeApp
                     if (!result.success) {
@@ -353,7 +360,7 @@ class MainActivity : FragmentActivity(), VoiceListener {
                     }
                 }
                 ActionType.SEND_WHATSAPP -> {
-                    ttsManager.speak(intent.speechFeedback)
+                    speak(intent.speechFeedback)
                     val result = AppRouter.launchWhatsApp(this@MainActivity, intent.query)
                     isLastNativeApp = result.isNativeApp
                 }
@@ -375,20 +382,20 @@ class MainActivity : FragmentActivity(), VoiceListener {
                     }
                     val speech = "$greeting! Abhi time $timeStr hua hai. $batMsg Hydrogen Bot aapki har voice command ke liye taiyyar hai."
                     statusText = speech
-                    ttsManager.speak(speech)
+                    speak(speech)
                     isLastNativeApp = false
                 }
                 ActionType.CAMERA_VISION -> {
-                    ttsManager.speak(intent.speechFeedback)
+                    speak(intent.speechFeedback)
                     openCameraLens()
                     isLastNativeApp = false
                 }
                 ActionType.BOOK_TICKET_IRCTC -> {
-                    ttsManager.speak(intent.speechFeedback)
+                    speak(intent.speechFeedback)
                     isLastNativeApp = true
                 }
                 ActionType.OPEN_APP -> {
-                    ttsManager.speak(intent.speechFeedback)
+                    speak(intent.speechFeedback)
                     val result = AppRouter.launchAppByName(this@MainActivity, intent.targetApp)
                     isLastNativeApp = result.isNativeApp
                     if (!result.success) {
@@ -396,7 +403,7 @@ class MainActivity : FragmentActivity(), VoiceListener {
                     }
                 }
                 ActionType.UNIVERSAL_SEARCH -> {
-                    ttsManager.speak(intent.speechFeedback)
+                    speak(intent.speechFeedback)
                     val result = AppRouter.launchUniversalSearch(this@MainActivity, intent.targetApp, intent.query)
                     isLastNativeApp = result.isNativeApp
                     if (!result.success) {
@@ -407,7 +414,7 @@ class MainActivity : FragmentActivity(), VoiceListener {
                     val result = AppRouter.launchSetAlarm(this@MainActivity, intent.query.ifBlank { spokenText })
                     val feedback = if (result.success) result.message else intent.speechFeedback
                     statusText = feedback
-                    ttsManager.speak(feedback)
+                    speak(feedback)
                     isLastNativeApp = result.isNativeApp
                     if (!result.success) {
                         Toast.makeText(this@MainActivity, result.message, Toast.LENGTH_LONG).show()
@@ -417,14 +424,14 @@ class MainActivity : FragmentActivity(), VoiceListener {
                     val result = AppRouter.launchSetTimer(this@MainActivity, intent.query.ifBlank { spokenText })
                     val feedback = if (result.success) result.message else intent.speechFeedback
                     statusText = feedback
-                    ttsManager.speak(feedback)
+                    speak(feedback)
                     isLastNativeApp = result.isNativeApp
                     if (!result.success) {
                         Toast.makeText(this@MainActivity, result.message, Toast.LENGTH_LONG).show()
                     }
                 }
                 else -> {
-                    ttsManager.speak(intent.speechFeedback)
+                    speak(intent.speechFeedback)
                     isLastNativeApp = false
                 }
             }

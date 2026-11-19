@@ -239,6 +239,23 @@ fun AuthScreen(
                     }
                 }
 
+                if (!isOtpSent) {
+                    TextButton(
+                        onClick = {
+                            authManager.loginAsGuest()
+                            onLoginSuccess()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = "⚡ Bina Login Seedha Chalao (Guest Access) →",
+                            color = SlateDark,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+
                 if (hasSavedSession && !isOtpSent) {
                     OutlinedButton(
                         onClick = onBiometricLogin,

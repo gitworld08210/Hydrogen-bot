@@ -222,15 +222,25 @@ object AppRouter {
     fun launchWhatsApp(context: Context, query: String): LaunchResult {
         val isInstalled = isAppInstalled(context, PackageRegistry.WHATSAPP_PACKAGE)
         val cleanMsg = query.trim()
+        val encodedMsg = Uri.encode(cleanMsg)
 
         return if (isInstalled) {
             try {
                 val intent = if (cleanMsg.isNotBlank()) {
-                    Intent(Intent.ACTION_SEND).apply {
-                        type = "text/plain"
-                        setPackage(PackageRegistry.WHATSAPP_PACKAGE)
-                        putExtra(Intent.EXTRA_TEXT, cleanMsg)
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    // Tier 1: Direct official whatsapp://send URI scheme (pre-fills message text in draft box)
+                    try {
+                        Intent(Intent.ACTION_VIEW).apply {
+                            data = Uri.parse("whatsapp://send?text=$encodedMsg")
+                            setPackage(PackageRegistry.WHATSAPP_PACKAGE)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                    } catch (e: Exception) {
+                        // Tier 2: https://api.whatsapp.com/send fallback
+                        Intent(Intent.ACTION_VIEW).apply {
+                            data = Uri.parse("https://api.whatsapp.com/send?text=$encodedMsg")
+                            setPackage(PackageRegistry.WHATSAPP_PACKAGE)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
                     }
                 } else {
                     context.packageManager.getLaunchIntentForPackage(PackageRegistry.WHATSAPP_PACKAGE)?.apply {
@@ -245,15 +255,33 @@ object AppRouter {
                     success = true,
                     targetApp = "WhatsApp",
                     isNativeApp = true,
-                    message = if (cleanMsg.isNotBlank()) "WhatsApp me message draft kar diya hai." else "WhatsApp open kar diya hai."
+                    message = if (cleanMsg.isNotBlank()) "WhatsApp me '$cleanMsg' type kar diya hai." else "WhatsApp open kar diya hai."
                 )
             } catch (e: Exception) {
-                LaunchResult(
-                    success = false,
-                    targetApp = "WhatsApp",
-                    isNativeApp = false,
-                    message = "WhatsApp launch error: ${e.localizedMessage}"
-                )
+                // Tier 3: Universal ACTION_SEND fallback
+                try {
+                    val sendIntent = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        setPackage(PackageRegistry.WHATSAPP_PACKAGE)
+                        putExtra(Intent.EXTRA_TEXT, cleanMsg)
+                        putExtra("sms_body", cleanMsg)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(sendIntent)
+                    LaunchResult(
+                        success = true,
+                        targetApp = "WhatsApp",
+                        isNativeApp = true,
+                        message = "WhatsApp me message draft kar diya hai."
+                    )
+                } catch (ex: Exception) {
+                    LaunchResult(
+                        success = false,
+                        targetApp = "WhatsApp",
+                        isNativeApp = false,
+                        message = "WhatsApp launch error: ${ex.localizedMessage}"
+                    )
+                }
             }
         } else {
             LaunchResult(

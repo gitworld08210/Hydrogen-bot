@@ -6,17 +6,32 @@
 [![Backend: Supabase](https://img.shields.io/badge/Backend-Supabase_Postgres-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com)
 [![Auth: Supabase & Resend](https://img.shields.io/badge/Auth-Email_OTP-000000?style=for-the-badge&logo=resend&logoColor=white)](https://supabase.com)
 [![Notifications: Firebase FCM](https://img.shields.io/badge/Notifications-Firebase_FCM-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://firebase.google.com)
-[![Latest Release](https://img.shields.io/badge/Release-v1.9_Autonomous_Brain-0284C7?style=for-the-badge&logo=android&logoColor=white)](https://github.com/gitworld08210/Hydrogen-bot/raw/main/release/HydrogenBot-v1.9.apk)
+[![Latest Release](https://img.shields.io/badge/Release-v2.1_Autonomous_Live-0284C7?style=for-the-badge&logo=android&logoColor=white)](https://github.com/gitworld08210/Hydrogen-bot/raw/main/release/HydrogenBot-v2.1.apk)
 
 ---
 
-## 📲 Direct APK Download (v1.9 - Hermes Autonomous Brain + Live Price Comparison + Supabase Memory)
+## 📲 Direct APK Download (v2.1 - WhatsApp Auto-Type + Smart Shoes/Budget Shopping + Silent Chat)
 
 Aap seedha apne Android phone me latest signed APK download aur install kar sakte hain:
 
-👉 **[Download HydrogenBot-v1.9.apk (Direct Download)](https://github.com/gitworld08210/Hydrogen-bot/raw/main/release/HydrogenBot-v1.9.apk)** *(Size: ~13.4 MB)*
+👉 **[Download HydrogenBot-v2.1.apk (Direct Download)](https://github.com/gitworld08210/Hydrogen-bot/raw/main/release/HydrogenBot-v2.1.apk)** *(Size: ~13.4 MB)*
 
-### 🆕 What's New in v1.9 (Hermes Autonomous Cloud Brain & Universal Automation):
+### 🆕 What's New in v2.1:
+* 💬 **WhatsApp Real Auto-Typing (`whatsapp://send?text=...`):**
+  * Solved the issue where WhatsApp was only opening a blank contact list without typing the message text!
+  * Saying *"WhatsApp pe likho main 10 minute me aa raha hu"* extracts the clean message and opens WhatsApp with the draft box **already pre-filled and typed**!
+* 👟 **Smart Shopping & Budget Discovery (Google Web Search Bypass):**
+  * Fixed the bug where saying *"500 under me batao sport shoes aacha"* opened Google web search and searched the literal sentence!
+  * Now recognizes budget e-commerce queries (shoes, phone, earbuds, watch, clothes under any budget) and directly routes to **Amazon India and Flipkart** with clean keywords (`sports shoes under 500`) alongside the live Price Comparison card.
+* 🤫 **Silent Text Chat Mode (No TTS Voice in Chat):**
+  * As requested, when you type in the text chat ("AI Ask" mode), the bot **will NOT speak out loud** — it replies quietly on-screen via the chat UI.
+  * Voice reply is only triggered when you speak into the Microphone!
+* ☁️ **24/7 Render Keep-Alive Daemon:**
+  * Active background daemon (`keep_render_alive.ps1`) continuously pings `https://hydrogen-bot-n382.onrender.com/health` every 5 minutes so Render **never goes to sleep**.
+* ⚡ **1-Tap Direct Guest Access:**
+  * Added bypass on login screen to allow 1-tap instant entry into the assistant without waiting for email OTP!
+* 💾 **Live Supabase Continuous Memory Database:**
+  * Real-time sync with verified `public.hydrogen_memories` table on Supabase PostgreSQL.
 * 🧠 **Hermes Autonomous Cloud Brain (`HermesAgentClient.kt` & `ActionCard.kt`):**
   * Bot ab sirf single app launch nahi karta — background me **Hermes Cloud Brain** web scan aur reasoning karke complete **Autonomous Execution Plan** generate karta hai.
   * Screen par **"Hermes Live Analysis"** aur step-by-step instructions aate hain ("Kya kya karna hai").

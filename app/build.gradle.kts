@@ -15,8 +15,8 @@ android {
         applicationId = "com.hydrogen.bot"
         minSdk = 26
         targetSdk = 34
-        versionCode = 9
-        versionName = "1.9.0"
+        versionCode = 11
+        versionName = "2.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

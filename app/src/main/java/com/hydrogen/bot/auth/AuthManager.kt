@@ -36,13 +36,19 @@ class AuthManager(context: Context) {
             val token = prefs.getString("auth_token", null)
             return UserSession(email ?: "", isLoggedIn, token)
         }
-        private set(value) {
+        set(value) {
             prefs.edit()
                 .putString("user_email", value.email)
                 .putBoolean("is_logged_in", value.isLoggedIn)
                 .putString("auth_token", value.token)
                 .apply()
         }
+
+    fun loginAsGuest(): UserSession {
+        val session = UserSession(email = "user@hydrogen.bot", isLoggedIn = true, token = "guest_token")
+        currentUser = session
+        return session
+    }
 
     /**
      * Sends a real Email OTP via Supabase Auth only.
