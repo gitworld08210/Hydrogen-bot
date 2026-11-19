@@ -39,6 +39,64 @@ class HydrogenAccessibilityService : AccessibilityService() {
         if (armWhatsAppAutoSend && (pkgName == "com.whatsapp" || pkgName == "com.whatsapp.w4b")) {
             tryAutoSendWhatsAppWithRetries()
         }
+
+        // WhatsApp Autonomous In-App Search Watcher (e.g. "search karo Minnu")
+        val searchQuery = armWhatsAppSearchQuery
+        if (!searchQuery.isNullOrBlank() && (pkgName == "com.whatsapp" || pkgName == "com.whatsapp.w4b")) {
+            tryAutoSearchWhatsAppWithRetries(searchQuery)
+        }
+    }
+
+    private fun tryAutoSearchWhatsAppWithRetries(query: String) {
+        val delays = listOf(500L, 1000L, 1800L, 2800L)
+        fun scheduleNext(index: Int) {
+            if (index >= delays.size || armWhatsAppSearchQuery == null) return
+            mainHandler.postDelayed({
+                val ok = performWhatsAppSearch(query)
+                if (ok) {
+                    Log.i(TAG, "Autonomous WhatsApp Search Successful for: $query")
+                    armWhatsAppSearchQuery = null
+                } else {
+                    scheduleNext(index + 1)
+                }
+            }, delays[index])
+        }
+        scheduleNext(0)
+    }
+
+    private fun performWhatsAppSearch(query: String): Boolean {
+        val root = rootInActiveWindow ?: return false
+
+        // 1. Click search menu item or icon if search bar isn't already focused
+        val searchIds = listOf("com.whatsapp:id/menuitem_search", "com.whatsapp:id/search_holder", "com.whatsapp:id/search_btn")
+        for (id in searchIds) {
+            val nodes = root.findAccessibilityNodeInfosByViewId(id)
+            for (node in nodes) {
+                performClickOnNode(node)
+            }
+        }
+
+        val allNodes = mutableListOf<AccessibilityNodeInfo>()
+        collectAllNodes(root, allNodes)
+        for (node in allNodes) {
+            val desc = node.contentDescription?.toString()?.lowercase() ?: ""
+            if (desc == "search" || desc == "खोजें" || desc == "search contacts") {
+                performClickOnNode(node)
+                break
+            }
+        }
+
+        // 2. Inject search query text into the search EditText
+        for (node in allNodes) {
+            if (node.className == "android.widget.EditText" || node.isEditable) {
+                val args = android.os.Bundle().apply {
+                    putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, query)
+                }
+                val set = node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+                if (set) return true
+            }
+        }
+        return false
     }
 
     private fun tryAutoSendWhatsAppWithRetries() {
@@ -86,6 +144,9 @@ class HydrogenAccessibilityService : AccessibilityService() {
         @Volatile
         var armWhatsAppAutoSend: Boolean = false
 
+        @Volatile
+        var armWhatsAppSearchQuery: String? = null
+
         /**
          * Checks if the Accessibility Service is active and granted by the user.
          */
@@ -97,6 +158,21 @@ class HydrogenAccessibilityService : AccessibilityService() {
          */
         fun armAutoSend(enable: Boolean = true) {
             armWhatsAppAutoSend = enable
+        }
+
+        /**
+         * Arms the WhatsApp in-app searcher (e.g. for "Minnu search karo")
+         */
+        fun armSearch(query: String) {
+            armWhatsAppSearchQuery = query
+        }
+
+        /**
+         * Sends a message into the currently open active chat or top search result ("esko hi bhejo")
+         */
+        fun sendContextualMessage(message: String): Boolean {
+            val s = instance ?: return false
+            return s.performContextualSend(message)
         }
 
         /**
@@ -292,6 +368,44 @@ class HydrogenAccessibilityService : AccessibilityService() {
         }
 
         return false
+    }
+
+    fun performContextualSend(message: String): Boolean {
+        val root = rootInActiveWindow ?: return false
+        val allNodes = mutableListOf<AccessibilityNodeInfo>()
+        collectAllNodes(root, allNodes)
+
+        // 1. If we are in a search list, click the first contact row
+        for (node in allNodes) {
+            val id = node.viewIdResourceName ?: ""
+            if (id.contains("contact_row") || id.contains("conversations_row") || id.contains("chat_row") || id.contains("contactpicker_row")) {
+                performClickOnNode(node)
+                break
+            }
+        }
+
+        // 2. Type message into the chat EditText
+        mainHandler.postDelayed({
+            val currentRoot = rootInActiveWindow ?: return@postDelayed
+            val currentNodes = mutableListOf<AccessibilityNodeInfo>()
+            collectAllNodes(currentRoot, currentNodes)
+            for (node in currentNodes) {
+                val id = node.viewIdResourceName ?: ""
+                if (id.contains("entry") || id.contains("message_entry") || node.className == "android.widget.EditText") {
+                    val args = android.os.Bundle().apply {
+                        putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, message)
+                    }
+                    node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, args)
+                    break
+                }
+            }
+            // 3. Tap Send button
+            mainHandler.postDelayed({
+                autoSendWhatsApp()
+            }, 500)
+        }, 600)
+
+        return true
     }
 
     private fun collectAllNodes(parent: AccessibilityNodeInfo?, list: MutableList<AccessibilityNodeInfo>) {

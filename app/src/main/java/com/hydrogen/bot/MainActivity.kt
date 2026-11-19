@@ -433,9 +433,11 @@ class MainActivity : FragmentActivity(), VoiceListener {
             memoryManager.recordInteraction(authManager.currentUser.email, spokenText, intent)
 
             // Voice response gate: speak only on voice input; stay silent in text chat mode
-            val speak: (String) -> Unit = { text ->
+            fun speak(text: String, onDone: (() -> Unit)? = null) {
                 if (isVoiceInput) {
-                    ttsManager.speak(text)
+                    ttsManager.speak(text, onDone)
+                } else {
+                    onDone?.invoke()
                 }
             }
 
@@ -477,26 +479,32 @@ class MainActivity : FragmentActivity(), VoiceListener {
                 }
                 ActionType.SEND_WHATSAPP -> {
                     speak(intent.speechFeedback)
+                    val isContextual = intent.details["contextual"] == "true"
                     val contactName = intent.details["contact"] ?: ""
                     val messageText = intent.details["message"] ?: intent.query
 
-                    // Check contact permission if contact name is requested
-                    if (contactName.isNotBlank() && ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
-                        requestContactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
-                    }
+                    if (isContextual) {
+                        // "esko hi bhejo": Types message into currently open chat & auto-sends!
+                        HydrogenAccessibilityService.sendContextualMessage(messageText)
+                    } else {
+                        // Check contact permission if contact name is requested
+                        if (contactName.isNotBlank() && ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+                            requestContactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+                        }
 
-                    // Direct phone lookup by name from device contacts
-                    val phoneNumber = if (contactName.isNotBlank()) {
-                        ContactLookupHelper.findPhoneNumberByName(this@MainActivity, contactName)
-                    } else null
+                        // Direct phone lookup by name from device contacts
+                        val phoneNumber = if (contactName.isNotBlank()) {
+                            ContactLookupHelper.findPhoneNumberByName(this@MainActivity, contactName)
+                        } else null
 
-                    // Arms accessibility service to auto-tap Send button once WhatsApp opens!
-                    HydrogenAccessibilityService.armAutoSend(true)
+                        // Arms accessibility service to auto-tap Send button once WhatsApp opens!
+                        HydrogenAccessibilityService.armAutoSend(true)
 
-                    val result = AppRouter.launchWhatsApp(this@MainActivity, messageText, phoneNumber)
-                    isLastNativeApp = result.isNativeApp
-                    if (!result.success) {
-                        Toast.makeText(this@MainActivity, result.message, Toast.LENGTH_LONG).show()
+                        val result = AppRouter.launchWhatsApp(this@MainActivity, messageText, phoneNumber)
+                        isLastNativeApp = result.isNativeApp
+                        if (!result.success) {
+                            Toast.makeText(this@MainActivity, result.message, Toast.LENGTH_LONG).show()
+                        }
                     }
                 }
                 ActionType.SCROLL_DOWN -> {
@@ -636,20 +644,34 @@ class MainActivity : FragmentActivity(), VoiceListener {
                     isLastNativeApp = true
                 }
                 ActionType.OPEN_APP -> {
-                    speak(intent.speechFeedback)
+                    val keepListening = intent.details["keepListening"] == "true"
                     val result = AppRouter.launchAppByName(this@MainActivity, intent.targetApp)
                     isLastNativeApp = result.isNativeApp
                     if (!result.success) {
                         Toast.makeText(this@MainActivity, result.message, Toast.LENGTH_LONG).show()
                     }
+                    speak(intent.speechFeedback) {
+                        if (keepListening && isVoiceInput) {
+                            // Shilex JARVIS behavior: Keep mic open & listening over the opened app!
+                            lifecycleScope.launch {
+                                kotlinx.coroutines.delay(400)
+                                voiceManager.startListening()
+                            }
+                        }
+                    }
                 }
                 ActionType.UNIVERSAL_SEARCH -> {
-                    speak(intent.speechFeedback)
-                    val result = AppRouter.launchUniversalSearch(this@MainActivity, intent.targetApp, intent.query)
-                    isLastNativeApp = result.isNativeApp
-                    if (!result.success) {
-                        Toast.makeText(this@MainActivity, result.message, Toast.LENGTH_LONG).show()
+                    if (intent.targetApp.equals("WhatsApp", ignoreCase = true)) {
+                        HydrogenAccessibilityService.armSearch(intent.query)
+                        AppRouter.launchWhatsApp(this@MainActivity, "")
+                    } else {
+                        val result = AppRouter.launchUniversalSearch(this@MainActivity, intent.targetApp, intent.query)
+                        isLastNativeApp = result.isNativeApp
+                        if (!result.success) {
+                            Toast.makeText(this@MainActivity, result.message, Toast.LENGTH_LONG).show()
+                        }
                     }
+                    speak(intent.speechFeedback)
                 }
                 ActionType.SET_ALARM -> {
                     val result = AppRouter.launchSetAlarm(this@MainActivity, intent.query.ifBlank { spokenText })

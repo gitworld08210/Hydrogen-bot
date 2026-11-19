@@ -122,18 +122,114 @@ class GeminiIntentParser(
             clean.endsWith(" mat")
     }
 
+    private fun resolveKnownAppName(raw: String): String? {
+        val s = raw.trim().lowercase()
+        return when {
+            s == "whatsapp" || s == "whats app" || s == "व्हाट्सएप" || s == "व्हाट्सऐप" -> "WhatsApp"
+            s == "youtube" || s == "you tube" || s == "यूट्यूब" -> "YouTube"
+            s == "instagram" || s == "insta" || s == "इंस्टाग्राम" -> "Instagram"
+            s == "camera" || s == "कैमरा" -> "Camera"
+            s == "calculator" || s == "कैलकुलेटर" -> "Calculator"
+            s == "chrome" || s == "browser" || s == "क्रोम" -> "Chrome"
+            s == "settings" || s == "सेटिंग्स" -> "Settings"
+            s == "spotify" || s == "स्पॉटिफाई" -> "Spotify"
+            s == "telegram" || s == "टेलीग्राम" -> "Telegram"
+            s == "clock" || s == "घड़ी" -> "Clock"
+            s == "maps" || s == "google maps" || s == "नक्शा" -> "Google Maps"
+            s == "gmail" || s == "email" || s == "मेल" -> "Gmail"
+            s == "amazon" || s == "अमेज़न" -> "Amazon India"
+            s == "flipkart" || s == "फ्लिपकार्ट" -> "Flipkart"
+            s == "blinkit" || s == "ब्लिंकित" -> "Blinkit"
+            else -> null
+        }
+    }
+
     private fun parseOfflineRules(clean: String, original: String, contextProduct: String? = null): ParsedIntent? {
         // "यूट्यूब देखा नहीं" is a statement, not a command — skip every
         // keyword rule so Gemini / the conversational fallback answers it.
         if (hasNegation(clean)) return null
 
-        // 0. Direct Google / Web Search (e.g. "search will power", "google pe will power", "search quantum computing", "dhoondo will power")
+        // 1. PURE APP LAUNCH (Priority 1: Matches "open whatsapp", "whatsapp kholo", "open youtube", etc.)
+        val isWhatsAppOpen = clean == "open whatsapp" || clean == "whatsapp open" ||
+            clean == "whatsapp kholo" || clean == "whatsapp open karo" || clean == "whatsapp chalu karo" || clean == "whatsapp khol" ||
+            clean == "open whats app" || clean == "whats app open" || clean == "whats app kholo" ||
+            clean == "व्हाट्सएप खोलो" || clean == "व्हाट्सएप ओपन" || clean == "व्हाट्सएप चालू करो" ||
+            clean == "ओपन व्हाट्सएप" || clean == "व्हाट्सऐप खोलो" || clean == "व्हाट्सऐप ओपन" || clean == "ओपन व्हाट्सऐप"
+        if (isWhatsAppOpen) {
+            return ParsedIntent(
+                action = ActionType.OPEN_APP,
+                targetApp = "WhatsApp",
+                query = "",
+                speechFeedback = "WhatsApp khol diya hai. Kisko message bhejna hai ya search karna hai?",
+                details = mapOf("keepListening" to "true")
+            )
+        }
+
+        // Generic App Launch: "open [app]" or "[app] kholo / open"
+        val appLaunchRegexA = Regex("^(?:open|launch|kholo|khol|chalu karo|start)\\s+([a-zA-Z0-9\\u0900-\\u097F\\s]+)$")
+        val appLaunchRegexB = Regex("^([a-zA-Z0-9\\u0900-\\u097F\\s]+?)\\s+(?:open|kholo|khol|chalu karo|chalao|start|launch)$")
+        val appLaunchMatch = appLaunchRegexA.find(clean) ?: appLaunchRegexB.find(clean)
+        if (appLaunchMatch != null) {
+            val appRaw = appLaunchMatch.groupValues[1].trim()
+            val targetApp = resolveKnownAppName(appRaw)
+            if (targetApp != null) {
+                return ParsedIntent(
+                    action = ActionType.OPEN_APP,
+                    targetApp = targetApp,
+                    query = "",
+                    speechFeedback = "$targetApp open kar diya hai.",
+                    details = mapOf("keepListening" to "true")
+                )
+            }
+        }
+
+        // 2. IN-APP SEARCH (e.g. "search karo Minnu whatsapp pe", "whatsapp pe search karo Minnu")
+        if ((clean.contains("whatsapp") || clean.contains("व्हाट्सएप")) &&
+            (clean.contains("search") || clean.contains("dhoondo") || clean.contains("dhundo") || clean.contains("खोजो") || clean.contains("ढूंढो") || clean.contains("सर्च"))) {
+            val q = clean
+                .replace("search karo", "").replace("search", "").replace("सर्च करो", "").replace("सर्च", "")
+                .replace("whatsapp pe", "").replace("whatsapp par", "").replace("whatsapp me", "").replace("whatsapp", "")
+                .replace("व्हाट्सएप पे", "").replace("व्हाट्सएप पर", "").replace("व्हाट्सएप", "").replace("व्हाट्सऐप", "")
+                .replace("dhoondo", "").replace("dhundo", "").replace("khojo", "").replace("खोजो", "").replace("ढूंढो", "")
+                .replace("mere liye", "").replace("please", "").replace("karo", "").replace("kar do", "").trim()
+            if (q.isNotBlank()) {
+                return ParsedIntent(
+                    action = ActionType.UNIVERSAL_SEARCH,
+                    targetApp = "WhatsApp",
+                    query = q,
+                    speechFeedback = "WhatsApp par '$q' search kar raha hoon."
+                )
+            }
+        }
+
+        // 3. CONTEXTUAL MESSAGE SEND (e.g. "esko hi bhejo", "inhe hi bhejo", "esko message bhejo hi")
+        if (clean.startsWith("esko ") || clean.startsWith("isko ") || clean.startsWith("inhe ") ||
+            clean.startsWith("isko message ") || clean.startsWith("esko message ")) {
+            val msg = clean
+                .removePrefix("esko message").removePrefix("isko message")
+                .removePrefix("esko").removePrefix("isko").removePrefix("inhe").trim()
+                .replace("bhejo", "").replace("likho", "").replace("send karo", "").replace("type karo", "")
+                .replace("भेजो", "").replace("लिखो", "").replace("टाइप करो", "")
+                .replace("bolo", "").replace("बोलो", "").replace("ki ", "")
+                .trim()
+            if (msg.isNotBlank()) {
+                return ParsedIntent(
+                    action = ActionType.SEND_WHATSAPP,
+                    targetApp = "WhatsApp",
+                    query = msg,
+                    speechFeedback = "Message '$msg' bhej raha hoon.",
+                    details = mapOf("contextual" to "true", "message" to msg)
+                )
+            }
+        }
+
+        // 4. Direct Google / Web Search (e.g. "search will power", "google pe will power")
         val searchPrefixes = listOf(
             "search karo", "search for", "search", "google pe search karo", "google pe search", "google pe",
             "google par", "google search", "google", "dhoondo", "dhundo", "khojo", "खोजो", "ढूंढो", "सर्च करो", "सर्च"
         )
         for (prefix in searchPrefixes) {
-            if (clean.startsWith("$prefix ") || clean == prefix) {
+            if ((clean.startsWith("$prefix ") || clean == prefix) && !clean.contains("amazon") && !clean.contains("flipkart") && !clean.contains("blinkit") && !clean.contains("youtube")) {
                 val q = clean.removePrefix(prefix).trim()
                     .replace("mere liye", "")
                     .replace("please", "")
@@ -479,15 +575,18 @@ class GeminiIntentParser(
                 }
             }
 
-            // Pattern D: Fallback stripping
+            // Fallback: If neither contact nor message was parsed, this is not a message send command!
             if (cleanMsg.isBlank() && contactName.isBlank()) {
-                cleanMsg = extractQuery(clean, listOf(
-                    "whatsapp pe", "whatsapp par", "whatsapp me", "whatsapp", "व्हाट्सएप पे", "व्हाट्सएप पर", "व्हाट्सएप", "व्हाट्सऐप",
-                    "message bhejo", "message send karo", "message", "मैसेज भेजो", "मैसेज", "bolo", "khol", "open", "खोलो"
-                ))
+                return ParsedIntent(
+                    action = ActionType.OPEN_APP,
+                    targetApp = "WhatsApp",
+                    query = "",
+                    speechFeedback = "WhatsApp khol diya hai. Kisko message bhejna hai ya search karna hai?",
+                    details = mapOf("keepListening" to "true")
+                )
             }
 
-            // If message is just "hi" or "hello", keep it clean
+            // If contact is given without message, default to empty or gentle greeting
             if (cleanMsg.isBlank() && contactName.isNotBlank()) {
                 cleanMsg = "Hi"
             }
@@ -507,28 +606,13 @@ class GeminiIntentParser(
             if (contactName.isNotBlank()) detailsMap["contact"] = contactName
             if (cleanMsg.isNotBlank()) detailsMap["message"] = cleanMsg
 
-            val plan = if (cleanMsg.isNotBlank()) {
-                AutonomousPlan(
-                    goal = if (contactName.isNotBlank()) "Send WhatsApp to $contactName" else "WhatsApp Message Auto-Type",
-                    cloudReasoning = "WhatsApp intent detected. Recipient: '${contactName.ifBlank { "Any" }}', Message: '$cleanMsg'.",
-                    steps = listOf(
-                        AgentExecutionStep(1, "Parse Recipient & Text", "Recipient: '$contactName', Text: '$cleanMsg'", true),
-                        AgentExecutionStep(2, "Contact Lookup & Route", "Looking up phone number and launching direct chat", true),
-                        AgentExecutionStep(3, "Accessibility Auto-Send", "Tapping Send button autonomously", true)
-                    ),
-                    autoTypeText = cleanMsg,
-                    targetApp = "WhatsApp",
-                    learnedFact = "User sent WhatsApp message to '${contactName.ifBlank { "User" }}': '$cleanMsg'"
-                )
-            } else null
-
             return ParsedIntent(
                 action = ActionType.SEND_WHATSAPP,
                 targetApp = "WhatsApp",
                 query = cleanMsg,
                 speechFeedback = feedback,
                 details = detailsMap,
-                autonomousPlan = plan
+                autonomousPlan = null // Clean & Real: No fake hardcoded cards!
             )
         }
 
