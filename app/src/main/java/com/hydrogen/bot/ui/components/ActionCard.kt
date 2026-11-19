@@ -125,7 +125,7 @@ fun ActionCard(
                         .padding(horizontal = 8.dp, vertical = 4.dp)
                 ) {
                     Text(
-                        text = if (plan != null) "LIVE CLOUD" else (if (isNativeApp) "NATIVE APP" else "FALLBACK"),
+                        text = if (plan != null) "LIVE CLOUD" else (if (isNativeApp) "NATIVE APP" else (if (intent.action == ActionType.GENERAL_QUERY) "CHAT" else "FALLBACK")),
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (plan != null) Color(0xFF0369A1) else (if (isNativeApp) HydrogenBlue else SlateMuted)

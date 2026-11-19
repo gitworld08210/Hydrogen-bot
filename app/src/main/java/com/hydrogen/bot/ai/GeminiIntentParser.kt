@@ -108,7 +108,25 @@ class GeminiIntentParser(
         )
     }
 
+    /**
+     * Negation / statement guard — fixes the "यूट्यूब देखा नहीं" bug.
+     * A mention is not a command: if the user says नहीं / nahi / मत,
+     * NO offline keyword rule may fire. Returning null here lets the
+     * Gemini ladder / conversational fallback judge the intent instead
+     * (the Mark-LVII principle: the LLM judges, keywords don't decide).
+     */
+    private fun hasNegation(clean: String): Boolean {
+        return clean.contains("नहीं") || clean.contains("नही") ||
+            clean.contains("nahi") || clean.contains("nahin") ||
+            clean.contains("मत") || clean.contains(" mat ") ||
+            clean.endsWith(" mat")
+    }
+
     private fun parseOfflineRules(clean: String, original: String, contextProduct: String? = null): ParsedIntent? {
+        // "यूट्यूब देखा नहीं" is a statement, not a command — skip every
+        // keyword rule so Gemini / the conversational fallback answers it.
+        if (hasNegation(clean)) return null
+
         // Morning Briefing / Battery Check
         if (clean.contains("good morning") || clean.contains("गुड मॉर्निंग") || clean.contains("सुप्रभात") ||
             clean.contains("briefing") || clean.contains("ब्रीफिंग") || clean.contains("battery") || clean.contains("बैटरी")) {
