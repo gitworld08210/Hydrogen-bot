@@ -6,17 +6,28 @@
 [![Backend: Supabase](https://img.shields.io/badge/Backend-Supabase_Postgres-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com)
 [![Auth: Supabase & Resend](https://img.shields.io/badge/Auth-Email_OTP-000000?style=for-the-badge&logo=resend&logoColor=white)](https://supabase.com)
 [![Notifications: Firebase FCM](https://img.shields.io/badge/Notifications-Firebase_FCM-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://firebase.google.com)
-[![Latest Release](https://img.shields.io/badge/Release-v2.1_Autonomous_Live-0284C7?style=for-the-badge&logo=android&logoColor=white)](https://github.com/gitworld08210/Hydrogen-bot/raw/main/release/HydrogenBot-v2.1.apk)
+[![Latest Release](https://img.shields.io/badge/Release-v2.6_Shilex_JARVIS_Voice-0284C7?style=for-the-badge&logo=android&logoColor=white)](https://github.com/gitworld08210/Hydrogen-bot/raw/main/release/HydrogenBot-v2.6.apk)
 
 ---
 
-## 📲 Direct APK Download (v2.1 - WhatsApp Auto-Type + Smart Shoes/Budget Shopping + Silent Chat)
+## 📲 Direct APK Download (v2.6.0 - Conversational JARVIS WhatsApp Voice Flow)
 
 Aap seedha apne Android phone me latest signed APK download aur install kar sakte hain:
 
-👉 **[Download HydrogenBot-v2.1.apk (Direct Download)](https://github.com/gitworld08210/Hydrogen-bot/raw/main/release/HydrogenBot-v2.1.apk)** *(Size: ~13.4 MB)*
+👉 **[Download HydrogenBot-v2.6.apk (Direct Download)](https://github.com/gitworld08210/Hydrogen-bot/raw/main/release/HydrogenBot-v2.6.apk)** *(Size: ~14.1 MB)*
 
-### 🆕 What's New in v2.1:
+### 🆕 What's New in v2.6.0:
+* 🎙️ **Conversational Shilex JARVIS WhatsApp Flow (No Mic Cutoff):**
+  * Fixed the issue where saying *"Open WhatsApp"* opened WhatsApp and immediately killed the microphone in the background.
+  * Hydrogen Bot now stays in the foreground, speaks *"WhatsApp ready hai. Kisko message bhejna hai ya kya search karna hai?"*, and keeps the **foreground microphone active** so you can speak hands-free!
+* 🚀 **Eliminated Cloud LLM Hallucinations ("Android kholne nahi de raha"):**
+  * WhatsApp opening and in-app commands now resolve 100% locally with 0ms latency. No fake cloud excuses.
+* 💬 **Hands-Free Contact Messaging:**
+  * Speak *"send karo hi Vishnu ko"* or *"Vishnu ko hi bhejo"* $\rightarrow$ Looks up contact, launches chat, and auto-sends `"hi"`!
+* 🔍 **WhatsApp In-App Search:**
+  * Speak *"search karo Minnu"* or *"Minnu search karo"* $\rightarrow$ Automatically searches Minnu in WhatsApp!
+* ⚡ **Foreground Service Microphone Permission:**
+  * Added `FOREGROUND_SERVICE_MICROPHONE` for continuous system overlay mic listening.
 * 💬 **WhatsApp Real Auto-Typing (`whatsapp://send?text=...`):**
   * Solved the issue where WhatsApp was only opening a blank contact list without typing the message text!
   * Saying *"WhatsApp pe likho main 10 minute me aa raha hu"* extracts the clean message and opens WhatsApp with the draft box **already pre-filled and typed**!
