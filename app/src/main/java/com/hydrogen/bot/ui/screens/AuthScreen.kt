@@ -1,5 +1,6 @@
 package com.hydrogen.bot.ui.screens
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -20,7 +21,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
@@ -40,12 +40,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.hydrogen.bot.R
 import com.hydrogen.bot.auth.AuthManager
 import com.hydrogen.bot.ui.theme.CanvasWhite
 import com.hydrogen.bot.ui.theme.HairlineBorder
@@ -101,7 +104,7 @@ fun AuthScreen(
                 )
             }
 
-            // CENTER HERO ILLUSTRATION / BADGE
+            // CENTER HERO ILLUSTRATION / BADGE — Hydrogen mascot
             Box(
                 modifier = Modifier
                     .size(140.dp)
@@ -110,11 +113,11 @@ fun AuthScreen(
                     .border(1.dp, HairlineBorder, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(
-                    imageVector = Icons.Default.SmartToy,
-                    contentDescription = null,
-                    tint = Color(0xFF111215),
-                    modifier = Modifier.size(54.dp)
+                Image(
+                    painter = painterResource(id = R.drawable.hydrogen_mascot),
+                    contentDescription = "Hydrogen mascot",
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.fillMaxSize()
                 )
             }
 
