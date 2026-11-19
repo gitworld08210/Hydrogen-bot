@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">Hydrogen Bot</string>
+    <string name="tagline">Ultra-Fast Autonomous Voice Assistant</string>
+    <string name="tap_to_speak">Tap to Speak</string>
+    <string name="listening">Listening…</string>
+    <string name="thinking">Hydrogen is reasoning…</string>
+    <string name="ready">Hydrogen Ready</string>
+    <string name="permission_mic_rationale">Hydrogen Bot requires Microphone access to listen to your voice commands.</string>
+</resources>

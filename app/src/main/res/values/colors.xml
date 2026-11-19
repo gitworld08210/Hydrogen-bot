@@ -1,0 +1,13 @@
+<resources>
+    <color name="canvas_white">#FFFFFF</color>
+    <color name="canvas_pearl">#F8FAFC</color>
+    <color name="slate_dark">#0F172A</color>
+    <color name="slate_muted">#64748B</color>
+    <color name="hairline_border">#E2E8F0</color>
+    <color name="hydrogen_blue">#0284C7</color>
+    <color name="hydrogen_soft_ring">#BAE6FD</color>
+    <color name="brand_amazon">#D97706</color>
+    <color name="brand_youtube">#DC2626</color>
+    <color name="brand_whatsapp">#16A34A</color>
+    <color name="safety_amber">#EA580C</color>
+</resources>
