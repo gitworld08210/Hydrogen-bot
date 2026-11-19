@@ -217,16 +217,57 @@ object AppRouter {
     }
 
     /**
-     * Launches WhatsApp directly with optional pre-filled message text.
+     * Launches Google Search directly in browser or system search.
      */
-    fun launchWhatsApp(context: Context, query: String): LaunchResult {
+    fun launchGoogleSearch(context: Context, query: String): LaunchResult {
+        val clean = query.trim()
+        val encoded = Uri.encode(clean)
+        return try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=$encoded")).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            LaunchResult(true, "Google Search", true, "Google par '$clean' search kar diya hai.")
+        } catch (e: Exception) {
+            try {
+                val searchIntent = Intent(Intent.ACTION_WEB_SEARCH).apply {
+                    putExtra(android.app.SearchManager.QUERY, clean)
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(searchIntent)
+                LaunchResult(true, "Google Search", true, "Google search khol diya hai.")
+            } catch (ex: Exception) {
+                LaunchResult(false, "Google Search", false, "Search open nahi ho paya: ${ex.message}")
+            }
+        }
+    }
+
+    /**
+     * Launches WhatsApp directly with optional pre-filled message text and optional direct phone number.
+     */
+    fun launchWhatsApp(context: Context, query: String, phoneNumber: String? = null): LaunchResult {
         val isInstalled = isAppInstalled(context, PackageRegistry.WHATSAPP_PACKAGE)
         val cleanMsg = query.trim()
         val encodedMsg = Uri.encode(cleanMsg)
 
         return if (isInstalled) {
             try {
-                val intent = if (cleanMsg.isNotBlank()) {
+                val intent = if (!phoneNumber.isNullOrBlank()) {
+                    // Direct chat with specific phone number! Bypasses contact picker completely.
+                    try {
+                        Intent(Intent.ACTION_VIEW).apply {
+                            data = Uri.parse("https://api.whatsapp.com/send?phone=$phoneNumber&text=$encodedMsg")
+                            setPackage(PackageRegistry.WHATSAPP_PACKAGE)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                    } catch (e: Exception) {
+                        Intent(Intent.ACTION_VIEW).apply {
+                            data = Uri.parse("whatsapp://send?phone=$phoneNumber&text=$encodedMsg")
+                            setPackage(PackageRegistry.WHATSAPP_PACKAGE)
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        }
+                    }
+                } else if (cleanMsg.isNotBlank()) {
                     // Tier 1: Direct official whatsapp://send URI scheme (pre-fills message text in draft box)
                     try {
                         Intent(Intent.ACTION_VIEW).apply {

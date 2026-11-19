@@ -41,6 +41,7 @@ import com.hydrogen.bot.notification.HydrogenNotificationListener
 import com.hydrogen.bot.notification.IncomingChat
 import com.hydrogen.bot.data.ChatPersonaManager
 import com.hydrogen.bot.data.ChatPersona
+import com.hydrogen.bot.router.ContactLookupHelper
 import com.hydrogen.bot.ai.AgentExecutionStep
 import com.hydrogen.bot.ai.AutonomousPlan
 import kotlinx.coroutines.launch
@@ -118,6 +119,15 @@ class MainActivity : FragmentActivity(), VoiceListener {
             safeStartListening()
         } else {
             Toast.makeText(this, "Microphone permission zaroori hai voice assistant ke liye.", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Contacts Permission Request Handler for Direct WhatsApp Routing
+    private val requestContactsPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (!isGranted) {
+            Toast.makeText(this, "Contacts permission dene se bot naam se direct WhatsApp bhej sakta hai.", Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -457,12 +467,37 @@ class MainActivity : FragmentActivity(), VoiceListener {
                         Toast.makeText(this@MainActivity, result.message, Toast.LENGTH_LONG).show()
                     }
                 }
+                ActionType.SEARCH_GOOGLE -> {
+                    speak(intent.speechFeedback)
+                    val result = AppRouter.launchGoogleSearch(this@MainActivity, intent.query)
+                    isLastNativeApp = result.isNativeApp
+                    if (!result.success) {
+                        Toast.makeText(this@MainActivity, result.message, Toast.LENGTH_LONG).show()
+                    }
+                }
                 ActionType.SEND_WHATSAPP -> {
                     speak(intent.speechFeedback)
+                    val contactName = intent.details["contact"] ?: ""
+                    val messageText = intent.details["message"] ?: intent.query
+
+                    // Check contact permission if contact name is requested
+                    if (contactName.isNotBlank() && ContextCompat.checkSelfPermission(this@MainActivity, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+                        requestContactsPermissionLauncher.launch(Manifest.permission.READ_CONTACTS)
+                    }
+
+                    // Direct phone lookup by name from device contacts
+                    val phoneNumber = if (contactName.isNotBlank()) {
+                        ContactLookupHelper.findPhoneNumberByName(this@MainActivity, contactName)
+                    } else null
+
                     // Arms accessibility service to auto-tap Send button once WhatsApp opens!
                     HydrogenAccessibilityService.armAutoSend(true)
-                    val result = AppRouter.launchWhatsApp(this@MainActivity, intent.query)
+
+                    val result = AppRouter.launchWhatsApp(this@MainActivity, messageText, phoneNumber)
                     isLastNativeApp = result.isNativeApp
+                    if (!result.success) {
+                        Toast.makeText(this@MainActivity, result.message, Toast.LENGTH_LONG).show()
+                    }
                 }
                 ActionType.SCROLL_DOWN -> {
                     speak(intent.speechFeedback)

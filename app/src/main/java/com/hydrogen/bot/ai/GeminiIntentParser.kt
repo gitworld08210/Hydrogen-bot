@@ -127,6 +127,31 @@ class GeminiIntentParser(
         // keyword rule so Gemini / the conversational fallback answers it.
         if (hasNegation(clean)) return null
 
+        // 0. Direct Google / Web Search (e.g. "search will power", "google pe will power", "search quantum computing", "dhoondo will power")
+        val searchPrefixes = listOf(
+            "search karo", "search for", "search", "google pe search karo", "google pe search", "google pe",
+            "google par", "google search", "google", "dhoondo", "dhundo", "khojo", "खोजो", "ढूंढो", "सर्च करो", "सर्च"
+        )
+        for (prefix in searchPrefixes) {
+            if (clean.startsWith("$prefix ") || clean == prefix) {
+                val q = clean.removePrefix(prefix).trim()
+                    .replace("mere liye", "")
+                    .replace("please", "")
+                    .replace("batao", "")
+                    .replace("karo", "")
+                    .replace("kar do", "")
+                    .trim()
+                if (q.isNotBlank()) {
+                    return ParsedIntent(
+                        action = ActionType.SEARCH_GOOGLE,
+                        targetApp = "Google Search",
+                        query = q,
+                        speechFeedback = "Google par '$q' search kar raha hoon."
+                    )
+                }
+            }
+        }
+
         // Morning Briefing / Battery Check
         if (clean.contains("good morning") || clean.contains("गुड मॉर्निंग") || clean.contains("सुप्रभात") ||
             clean.contains("briefing") || clean.contains("ब्रीफिंग") || clean.contains("battery") || clean.contains("बैटरी")) {
@@ -391,61 +416,118 @@ class GeminiIntentParser(
             clean.contains("message bhejo") || clean.contains("मैसेज भेजो") || clean.contains("मैसेज") ||
             clean.contains("likho") || clean.contains("लिखो") || clean.contains("type karo") || clean.contains("टाइप करो")) {
 
-            val messageKeywords = listOf(
-                "message type karo", "type karo", "likho", "bolo", "message bhejo", "message send karo",
-                "मैसेज टाइप करो", "टाइप करो", "लिखो", "बोलो", "मैसेज भेजो", "संदेश भेजो"
-            )
+            var contactName = ""
+            var cleanMsg = ""
 
-            var extractedMsg = ""
-            for (kw in messageKeywords) {
-                if (clean.contains(kw)) {
-                    val parts = clean.split(kw, limit = 2)
-                    if (parts.size > 1 && parts[1].trim().isNotBlank()) {
-                        extractedMsg = parts[1].trim()
-                            .replace("mere liye", "")
-                            .replace("please", "")
-                            .replace("karo", "")
-                            .replace("kar do", "")
-                            .replace("dena", "")
-                            .trim()
-                        break
+            // Pattern A: "[Contact] ke pass / ko whatsapp pe [Message] bhejo / likho"
+            // e.g. "Vishnu ke pass whatsapp pe hi bhejo", "Rohan ko whatsapp pe kal milte hain bhejo"
+            val patternA = Regex("^(.*?)\\s*(?:ke pass|ke paas|k pass|k paas|ko)\\s*(?:whatsapp|व्हाट्सएप|व्हाट्सऐप)\\s*(?:pe|par|me)?\\s*(.*?)(?:\\s*(?:bhejo|likho|send karo|type karo|भेजो|लिखो))?\$")
+            val matchA = patternA.find(clean)
+
+            if (matchA != null && matchA.groupValues[1].isNotBlank()) {
+                val candidateContact = matchA.groupValues[1].trim()
+                if (!candidateContact.contains("whatsapp") && !candidateContact.contains("व्हाट्सएप")) {
+                    contactName = candidateContact
+                    cleanMsg = matchA.groupValues[2].trim()
+                        .replace("bhejo", "")
+                        .replace("भेजो", "")
+                        .replace("message", "")
+                        .replace("मैसेज", "")
+                        .replace("ki ", "")
+                        .trim()
+                }
+            }
+
+            // Pattern B: "whatsapp pe [Contact] ko / ke pass [Message] bhejo"
+            // e.g. "whatsapp pe Vishnu ko hi bhejo", "whatsapp pe Rohan ko message bhejo ki kal aana"
+            if (contactName.isBlank()) {
+                val patternB = Regex("(?:whatsapp|व्हाट्सएप|व्हाट्सऐप)\\s*(?:pe|par|me)?\\s*(.*?)\\s*(?:ko|ke pass|ke paas|k pass|k paas)\\s*(.*)")
+                val matchB = patternB.find(clean)
+                if (matchB != null) {
+                    contactName = matchB.groupValues[1].trim()
+                    cleanMsg = matchB.groupValues[2].trim()
+                        .replace("bhejo", "")
+                        .replace("send karo", "")
+                        .replace("भेजो", "")
+                        .replace("message", "")
+                        .replace("मैसेज", "")
+                        .replace("ki ", "")
+                        .trim()
+                }
+            }
+
+            // Pattern C: Generic message without contact, or explicit "message type karo ..."
+            if (cleanMsg.isBlank()) {
+                val messageKeywords = listOf(
+                    "message type karo", "type karo", "likho", "bolo", "message bhejo", "message send karo",
+                    "मैसेज टाइप करो", "टाइप करो", "लिखो", "बोलो", "मैसेज भेजो", "संदेश भेजो"
+                )
+                for (kw in messageKeywords) {
+                    if (clean.contains(kw)) {
+                        val parts = clean.split(kw, limit = 2)
+                        if (parts.size > 1 && parts[1].trim().isNotBlank()) {
+                            cleanMsg = parts[1].trim()
+                                .replace("mere liye", "")
+                                .replace("please", "")
+                                .replace("karo", "")
+                                .replace("kar do", "")
+                                .replace("dena", "")
+                                .trim()
+                            break
+                        }
                     }
                 }
             }
 
-            if (extractedMsg.isBlank()) {
-                extractedMsg = extractQuery(clean, listOf(
+            // Pattern D: Fallback stripping
+            if (cleanMsg.isBlank() && contactName.isBlank()) {
+                cleanMsg = extractQuery(clean, listOf(
                     "whatsapp pe", "whatsapp par", "whatsapp me", "whatsapp", "व्हाट्सएप पे", "व्हाट्सएप पर", "व्हाट्सएप", "व्हाट्सऐप",
                     "message bhejo", "message send karo", "message", "मैसेज भेजो", "मैसेज", "bolo", "khol", "open", "खोलो"
                 ))
             }
 
-            val feedback = if (extractedMsg.isNotBlank()) {
-                "WhatsApp me '$extractedMsg' type kar diya hai."
-            } else {
-                "WhatsApp open kar raha hoon."
+            // If message is just "hi" or "hello", keep it clean
+            if (cleanMsg.isBlank() && contactName.isNotBlank()) {
+                cleanMsg = "Hi"
             }
 
-            val plan = if (extractedMsg.isNotBlank()) {
+            val feedback = when {
+                contactName.isNotBlank() && cleanMsg.isNotBlank() ->
+                    "${contactName.replaceFirstChar { it.uppercase() }} ko WhatsApp par '$cleanMsg' bhej raha hoon."
+                cleanMsg.isNotBlank() ->
+                    "WhatsApp me '$cleanMsg' type kar diya hai."
+                contactName.isNotBlank() ->
+                    "${contactName.replaceFirstChar { it.uppercase() }} ka WhatsApp open kar raha hoon."
+                else ->
+                    "WhatsApp open kar raha hoon."
+            }
+
+            val detailsMap = mutableMapOf<String, String>()
+            if (contactName.isNotBlank()) detailsMap["contact"] = contactName
+            if (cleanMsg.isNotBlank()) detailsMap["message"] = cleanMsg
+
+            val plan = if (cleanMsg.isNotBlank()) {
                 AutonomousPlan(
-                    goal = "WhatsApp Message Auto-Type",
-                    cloudReasoning = "WhatsApp intent detected. Pre-filling '$extractedMsg' in draft box.",
+                    goal = if (contactName.isNotBlank()) "Send WhatsApp to $contactName" else "WhatsApp Message Auto-Type",
+                    cloudReasoning = "WhatsApp intent detected. Recipient: '${contactName.ifBlank { "Any" }}', Message: '$cleanMsg'.",
                     steps = listOf(
-                        AgentExecutionStep(1, "Parse Message Text", "Extracted text: '$extractedMsg'", true),
-                        AgentExecutionStep(2, "Launch WhatsApp Deep Link", "Opening WhatsApp with pre-filled message", true),
-                        AgentExecutionStep(3, "Sync to Supabase Memory", "Logged communication intent", true)
+                        AgentExecutionStep(1, "Parse Recipient & Text", "Recipient: '$contactName', Text: '$cleanMsg'", true),
+                        AgentExecutionStep(2, "Contact Lookup & Route", "Looking up phone number and launching direct chat", true),
+                        AgentExecutionStep(3, "Accessibility Auto-Send", "Tapping Send button autonomously", true)
                     ),
-                    autoTypeText = extractedMsg,
+                    autoTypeText = cleanMsg,
                     targetApp = "WhatsApp",
-                    learnedFact = "User drafted WhatsApp message: '$extractedMsg'"
+                    learnedFact = "User sent WhatsApp message to '${contactName.ifBlank { "User" }}': '$cleanMsg'"
                 )
             } else null
 
             return ParsedIntent(
                 action = ActionType.SEND_WHATSAPP,
                 targetApp = "WhatsApp",
-                query = extractedMsg,
+                query = cleanMsg,
                 speechFeedback = feedback,
+                details = detailsMap,
                 autonomousPlan = plan
             )
         }

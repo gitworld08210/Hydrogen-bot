@@ -22,6 +22,7 @@ import android.view.accessibility.AccessibilityNodeInfo
 class HydrogenAccessibilityService : AccessibilityService() {
 
     private val mainHandler = Handler(Looper.getMainLooper())
+    private var isSendingAttemptInProgress = false
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -34,17 +35,34 @@ class HydrogenAccessibilityService : AccessibilityService() {
 
         val pkgName = event.packageName?.toString() ?: ""
 
-        // WhatsApp Autonomous Message Dispatch Watcher
-        if (armWhatsAppAutoSend && pkgName == "com.whatsapp") {
-            // Give WhatsApp 600ms to inflate chat window and paste text
+        // WhatsApp Autonomous Message Dispatch Watcher with Multi-Attempt Retries
+        if (armWhatsAppAutoSend && (pkgName == "com.whatsapp" || pkgName == "com.whatsapp.w4b")) {
+            tryAutoSendWhatsAppWithRetries()
+        }
+    }
+
+    private fun tryAutoSendWhatsAppWithRetries() {
+        if (!armWhatsAppAutoSend || isSendingAttemptInProgress) return
+        isSendingAttemptInProgress = true
+
+        val delays = listOf(400L, 800L, 1200L, 1800L, 2500L, 3500L)
+        fun scheduleNext(index: Int) {
+            if (index >= delays.size || !armWhatsAppAutoSend) {
+                isSendingAttemptInProgress = false
+                return
+            }
             mainHandler.postDelayed({
                 val sent = autoSendWhatsApp()
                 if (sent) {
-                    Log.i(TAG, "Autonomous WhatsApp Send Click Successful!")
+                    Log.i(TAG, "Autonomous WhatsApp Send Click Successful on attempt ${index + 1}!")
                     armWhatsAppAutoSend = false
+                    isSendingAttemptInProgress = false
+                } else {
+                    scheduleNext(index + 1)
                 }
-            }, 600)
+            }, delays[index])
         }
+        scheduleNext(0)
     }
 
     override fun onInterrupt() {
@@ -193,10 +211,13 @@ class HydrogenAccessibilityService : AccessibilityService() {
     fun autoSendWhatsApp(): Boolean {
         val root = rootInActiveWindow ?: return false
 
-        // 1. WhatsApp native Send button view ID
-        val sendById = root.findAccessibilityNodeInfosByViewId("com.whatsapp:id/send")
-        for (node in sendById) {
-            if (performClickOnNode(node)) return true
+        // 1. WhatsApp native Send button view IDs (standard & WhatsApp Business)
+        val candidateIds = listOf("com.whatsapp:id/send", "com.whatsapp:id/send_container", "com.whatsapp.w4b:id/send")
+        for (id in candidateIds) {
+            val nodes = root.findAccessibilityNodeInfosByViewId(id)
+            for (node in nodes) {
+                if (performClickOnNode(node)) return true
+            }
         }
 
         // 2. Scan all nodes for "Send" or Hindi "भेजें"
@@ -238,18 +259,38 @@ class HydrogenAccessibilityService : AccessibilityService() {
 
     private fun performClickOnNode(node: AccessibilityNodeInfo): Boolean {
         if (node.isClickable) {
-            return node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            val clicked = node.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+            if (clicked) return true
         }
         // Check parents if wrapper holds click listener
         var parent = node.parent
         var depth = 0
         while (parent != null && depth < 3) {
             if (parent.isClickable) {
-                return parent.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                val clicked = parent.performAction(AccessibilityNodeInfo.ACTION_CLICK)
+                if (clicked) return true
             }
             parent = parent.parent
             depth++
         }
+
+        // Fallback: Dispatch exact coordinate gesture tap on the node
+        try {
+            val rect = android.graphics.Rect()
+            node.getBoundsInScreen(rect)
+            if (rect.width() > 0 && rect.height() > 0) {
+                val clickPath = Path().apply {
+                    moveTo(rect.centerX().toFloat(), rect.centerY().toFloat())
+                }
+                val stroke = GestureDescription.StrokeDescription(clickPath, 0, 80)
+                val gesture = GestureDescription.Builder().addStroke(stroke).build()
+                dispatchGesture(gesture, null, null)
+                return true
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Gesture tap click error: ${e.message}")
+        }
+
         return false
     }
 
