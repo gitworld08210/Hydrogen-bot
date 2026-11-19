@@ -35,6 +35,8 @@ import com.hydrogen.bot.ui.theme.HydrogenBotTheme
 import com.hydrogen.bot.voice.TextToSpeechManager
 import com.hydrogen.bot.voice.VoiceListener
 import com.hydrogen.bot.voice.VoiceManager
+import com.hydrogen.bot.services.HydrogenAccessibilityService
+import com.hydrogen.bot.services.FloatingJarvisService
 import kotlinx.coroutines.launch
 import com.hydrogen.bot.data.SupabaseMemoryManager
 import java.text.SimpleDateFormat
@@ -67,6 +69,8 @@ class MainActivity : FragmentActivity(), VoiceListener {
     private var isLoggedIn by mutableStateOf(false)
     private var currentScreen by mutableStateOf("home") // "home", "auth", "vault"
     private var visionResult by mutableStateOf<VisionResult?>(null)
+    private var isAccessibilityEnabled by mutableStateOf(false)
+    private var isFloatingOrbActive by mutableStateOf(false)
 
     // Microphone Permission Request Handler
     private val requestPermissionLauncher = registerForActivityResult(
@@ -203,6 +207,7 @@ class MainActivity : FragmentActivity(), VoiceListener {
 
         isLoggedIn = authManager.currentUser.isLoggedIn
         currentScreen = if (isLoggedIn) "home" else "auth"
+        handleIncomingIntent(intent)
 
         setContent {
             HydrogenBotTheme {
@@ -256,6 +261,19 @@ class MainActivity : FragmentActivity(), VoiceListener {
                             isLastNativeApp = isLastNativeApp,
                             userEmail = authManager.currentUser.email.ifEmpty { "User" },
                             visionResult = visionResult,
+                            isAccessibilityEnabled = isAccessibilityEnabled,
+                            isFloatingOrbActive = isFloatingOrbActive,
+                            onToggleFloatingOrb = { enable ->
+                                if (enable) {
+                                    FloatingJarvisService.start(this@MainActivity)
+                                } else {
+                                    FloatingJarvisService.stop(this@MainActivity)
+                                }
+                                isFloatingOrbActive = FloatingJarvisService.isRunning
+                            },
+                            onOpenAccessibilitySettings = {
+                                HydrogenAccessibilityService.openAccessibilitySettings(this@MainActivity)
+                            },
                             onMicClick = { toggleListening() },
                             onOpenVision = { openCameraLens() },
                             onPickGallery = { openGalleryPicker() },
@@ -286,6 +304,24 @@ class MainActivity : FragmentActivity(), VoiceListener {
                     }
                 }
             }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        isAccessibilityEnabled = HydrogenAccessibilityService.isServiceEnabled()
+        isFloatingOrbActive = FloatingJarvisService.isRunning
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIncomingIntent(intent)
+    }
+
+    private fun handleIncomingIntent(intent: Intent?) {
+        if (intent?.action == FloatingJarvisService.ACTION_TRIGGER_VOICE) {
+            safeStartListening()
         }
     }
 
@@ -361,8 +397,70 @@ class MainActivity : FragmentActivity(), VoiceListener {
                 }
                 ActionType.SEND_WHATSAPP -> {
                     speak(intent.speechFeedback)
+                    // Arms accessibility service to auto-tap Send button once WhatsApp opens!
+                    HydrogenAccessibilityService.armAutoSend(true)
                     val result = AppRouter.launchWhatsApp(this@MainActivity, intent.query)
                     isLastNativeApp = result.isNativeApp
+                }
+                ActionType.SCROLL_DOWN -> {
+                    speak(intent.speechFeedback)
+                    val ok = HydrogenAccessibilityService.performScrollDown()
+                    if (!ok) {
+                        Toast.makeText(this@MainActivity, "Kripya Accessibility me Hydrogen Bot ON karein.", Toast.LENGTH_SHORT).show()
+                        HydrogenAccessibilityService.openAccessibilitySettings(this@MainActivity)
+                    }
+                    isLastNativeApp = false
+                }
+                ActionType.SCROLL_UP -> {
+                    speak(intent.speechFeedback)
+                    val ok = HydrogenAccessibilityService.performScrollUp()
+                    if (!ok) {
+                        Toast.makeText(this@MainActivity, "Kripya Accessibility me Hydrogen Bot ON karein.", Toast.LENGTH_SHORT).show()
+                        HydrogenAccessibilityService.openAccessibilitySettings(this@MainActivity)
+                    }
+                    isLastNativeApp = false
+                }
+                ActionType.PHONE_HOME -> {
+                    speak(intent.speechFeedback)
+                    val ok = HydrogenAccessibilityService.performHome()
+                    if (!ok) {
+                        HydrogenAccessibilityService.openAccessibilitySettings(this@MainActivity)
+                    }
+                    isLastNativeApp = false
+                }
+                ActionType.PHONE_BACK -> {
+                    speak(intent.speechFeedback)
+                    val ok = HydrogenAccessibilityService.performBack()
+                    if (!ok) {
+                        HydrogenAccessibilityService.openAccessibilitySettings(this@MainActivity)
+                    }
+                    isLastNativeApp = false
+                }
+                ActionType.PHONE_RECENTS -> {
+                    speak(intent.speechFeedback)
+                    val ok = HydrogenAccessibilityService.performRecents()
+                    if (!ok) {
+                        HydrogenAccessibilityService.openAccessibilitySettings(this@MainActivity)
+                    }
+                    isLastNativeApp = false
+                }
+                ActionType.PHONE_NOTIFICATIONS -> {
+                    speak(intent.speechFeedback)
+                    val ok = HydrogenAccessibilityService.performNotifications()
+                    if (!ok) {
+                        HydrogenAccessibilityService.openAccessibilitySettings(this@MainActivity)
+                    }
+                    isLastNativeApp = false
+                }
+                ActionType.AUTO_CLICK -> {
+                    speak(intent.speechFeedback)
+                    val ok = if (intent.query.isNotBlank()) {
+                        HydrogenAccessibilityService.clickByText(intent.query)
+                    } else false
+                    if (!ok) {
+                        Toast.makeText(this@MainActivity, "'${intent.query}' screen par nahi mila ya Accessibility band hai.", Toast.LENGTH_SHORT).show()
+                    }
+                    isLastNativeApp = false
                 }
                 ActionType.MORNING_BRIEFING -> {
                     val bm = getSystemService(Context.BATTERY_SERVICE) as BatteryManager

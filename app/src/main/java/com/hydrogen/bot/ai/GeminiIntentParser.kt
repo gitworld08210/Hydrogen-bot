@@ -178,6 +178,85 @@ class GeminiIntentParser(
             )
         }
 
+        // Autonomous JARVIS Screen Navigation & Gestures
+        // 1. Scroll Down / Next Video (Shorts, Reels, TikTok, Feeds)
+        if (clean.contains("scroll down") || clean.contains("scroll karo") || clean.contains("neeche scroll") ||
+            clean.contains("niche scroll") || clean.contains("next video") || clean.contains("agla video") ||
+            clean.contains("अगला वीडियो") || clean.contains("स्क्रोल डाउन") || clean.contains("swipe up")) {
+            return ParsedIntent(
+                action = ActionType.SCROLL_DOWN,
+                targetApp = "Phone Screen",
+                query = "",
+                speechFeedback = "Screen neeche scroll kar raha hoon."
+            )
+        }
+
+        // 2. Scroll Up / Previous Video
+        if (clean.contains("scroll up") || clean.contains("upar scroll") || clean.contains("previous video") ||
+            clean.contains("pichla video") || clean.contains("पिछला वीडियो") || clean.contains("स्क्रोल अप") || clean.contains("swipe down")) {
+            return ParsedIntent(
+                action = ActionType.SCROLL_UP,
+                targetApp = "Phone Screen",
+                query = "",
+                speechFeedback = "Screen upar scroll kar raha hoon."
+            )
+        }
+
+        // 3. Home Screen
+        if (clean.contains("home screen") || clean.contains("home pe jao") || clean.contains("home jao") ||
+            clean.contains("go to home") || clean.contains("होम स्क्रीन") || clean.contains("home karo")) {
+            return ParsedIntent(
+                action = ActionType.PHONE_HOME,
+                targetApp = "Android System",
+                query = "",
+                speechFeedback = "Home screen par ja raha hoon."
+            )
+        }
+
+        // 4. Back Button
+        if (clean == "back" || clean == "back jao" || clean == "go back" || clean == "piche jao" ||
+            clean.contains("back karo") || clean.contains("बैक जाओ") || clean.contains("पीछे जाओ")) {
+            return ParsedIntent(
+                action = ActionType.PHONE_BACK,
+                targetApp = "Android System",
+                query = "",
+                speechFeedback = "Back ja raha hoon."
+            )
+        }
+
+        // 5. Recent Apps
+        if (clean.contains("recent apps") || clean.contains("recents") || clean.contains("recent app") ||
+            clean.contains("रिसेंट ऐप्स") || clean.contains("recent kholo")) {
+            return ParsedIntent(
+                action = ActionType.PHONE_RECENTS,
+                targetApp = "Android System",
+                query = "",
+                speechFeedback = "Recent apps khol raha hoon."
+            )
+        }
+
+        // 6. Notification Panel
+        if (clean.contains("notification panel") || clean.contains("notifications") || clean.contains("notification kholo") ||
+            clean.contains("नोटिफिकेशन")) {
+            return ParsedIntent(
+                action = ActionType.PHONE_NOTIFICATIONS,
+                targetApp = "Android System",
+                query = "",
+                speechFeedback = "Notification panel pull kar raha hoon."
+            )
+        }
+
+        // 7. Auto Tap / Click
+        if (clean.contains("click karo") || clean.contains("tap karo") || clean.contains("daba do") || clean.contains("क्लिक करो")) {
+            val target = clean.replace("click karo", "").replace("tap karo", "").replace("daba do", "").replace("pe", "").replace("par", "").trim()
+            return ParsedIntent(
+                action = ActionType.AUTO_CLICK,
+                targetApp = "Phone Screen",
+                query = target,
+                speechFeedback = if (target.isNotBlank()) "'$target' par click kar raha hoon." else "Screen par click kar raha hoon."
+            )
+        }
+
         // Camera / Vision Scan
         if (clean.contains("camera") || clean.contains("कैमरा") || clean.contains("photo") || clean.contains("फोटो") ||
             clean.contains("scan") || clean.contains("स्कैन") || clean.contains("ye kya hai") || clean.contains("yeh kya hai")) {

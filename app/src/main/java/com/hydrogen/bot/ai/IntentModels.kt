@@ -17,6 +17,13 @@ enum class ActionType {
     SET_TIMER,
     OPEN_APP,
     UNIVERSAL_SEARCH,
+    SCROLL_DOWN,
+    SCROLL_UP,
+    PHONE_HOME,
+    PHONE_BACK,
+    PHONE_RECENTS,
+    PHONE_NOTIFICATIONS,
+    AUTO_CLICK,
     GENERAL_QUERY
 }
 

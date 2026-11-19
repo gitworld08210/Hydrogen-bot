@@ -41,6 +41,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -90,6 +91,10 @@ fun HomeScreen(
     onSearchAmazon: (String) -> Unit = {},
     onSearchFlipkart: (String) -> Unit = {},
     onSearchBlinkit: (String) -> Unit = {},
+    isAccessibilityEnabled: Boolean = false,
+    isFloatingOrbActive: Boolean = false,
+    onToggleFloatingOrb: (Boolean) -> Unit = {},
+    onOpenAccessibilitySettings: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     // Mode toggle between "Voice Chat" (Middle Screen) and "AI Ask" (Right Screen)
@@ -332,6 +337,16 @@ fun HomeScreen(
                         )
                     }
                 }
+
+                // JARVIS Autonomous Phone Controller Card
+                Spacer(modifier = Modifier.height(14.dp))
+                JarvisPhoneControllerCard(
+                    isAccessibilityEnabled = isAccessibilityEnabled,
+                    isFloatingOrbActive = isFloatingOrbActive,
+                    onToggleFloatingOrb = onToggleFloatingOrb,
+                    onOpenAccessibilitySettings = onOpenAccessibilitySettings,
+                    onQuickCommandClick = onQuickCommandClick
+                )
 
                 // Vision Result Card (If photo captured)
                 visionResult?.let { vision ->
@@ -687,3 +702,146 @@ fun HomeScreen(
         }
     }
 }
+
+@Composable
+fun JarvisPhoneControllerCard(
+    isAccessibilityEnabled: Boolean,
+    isFloatingOrbActive: Boolean,
+    onToggleFloatingOrb: (Boolean) -> Unit,
+    onOpenAccessibilitySettings: () -> Unit,
+    onQuickCommandClick: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFF8FAFC)),
+        border = BorderStroke(1.dp, HairlineBorder),
+        modifier = modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(14.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(if (isAccessibilityEnabled) Color(0xFF10B981) else Color(0xFFF59E0B))
+                    )
+                    Text(
+                        text = "JARVIS Phone Controller",
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 14.sp,
+                        color = SlateDark
+                    )
+                }
+
+                if (!isAccessibilityEnabled) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xFF111215))
+                            .clickable { onOpenAccessibilitySettings() }
+                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text(
+                            text = "Enable ⚙️",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                } else {
+                    Text(
+                        text = "Active 🟢",
+                        color = Color(0xFF059669),
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            // Floating Orb Toggle Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "Floating Cyber Orb",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = SlateDark
+                    )
+                    Text(
+                        text = "Always-on glowing mic on screen",
+                        fontSize = 11.sp,
+                        color = SlateSecondary
+                    )
+                }
+                Switch(
+                    checked = isFloatingOrbActive,
+                    onCheckedChange = { onToggleFloatingOrb(it) }
+                )
+            }
+
+            // Quick Gesture / Action Chips
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                item {
+                    JarvisChip("⬇️ Scroll Down") { onQuickCommandClick("scroll down") }
+                }
+                item {
+                    JarvisChip("⬆️ Scroll Up") { onQuickCommandClick("scroll up") }
+                }
+                item {
+                    JarvisChip("🏠 Home Screen") { onQuickCommandClick("home screen") }
+                }
+                item {
+                    JarvisChip("💬 Auto-Send WhatsApp") { onQuickCommandClick("WhatsApp pe hello type karo") }
+                }
+                item {
+                    JarvisChip("⬅️ Back") { onQuickCommandClick("back jao") }
+                }
+                item {
+                    JarvisChip("📑 Recent Apps") { onQuickCommandClick("recent apps") }
+                }
+                item {
+                    JarvisChip("🔔 Notifications") { onQuickCommandClick("notification panel") }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun JarvisChip(label: String, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(CanvasWhite)
+            .border(1.dp, HairlineBorder, RoundedCornerShape(14.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 10.dp, vertical = 6.dp)
+    ) {
+        Text(
+            text = label,
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            color = SlateDark
+        )
+    }
+}
+

@@ -6,4 +6,6 @@
     <string name="thinking">Hydrogen is reasoning…</string>
     <string name="ready">Hydrogen Ready</string>
     <string name="permission_mic_rationale">Hydrogen Bot requires Microphone access to listen to your voice commands.</string>
+    <string name="accessibility_service_description">Hydrogen Bot Autonomous JARVIS Controller enables hands-free voice automation, automated message dispatch, screen scrolling, and navigation gestures.</string>
+    <string name="jarvis_overlay_channel">JARVIS Phone Overlay</string>
 </resources>
