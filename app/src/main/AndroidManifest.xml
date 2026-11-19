@@ -11,10 +11,14 @@
 
     <!-- Package queries for Native App Detection (Android 11+) -->
     <queries>
-        <!-- Speech Recognition Service Query (Mandatory for Android 11+) -->
+        <!-- Speech Recognition Service & Voice Intent Queries (Mandatory for Android 11+) -->
         <intent>
             <action android:name="android.speech.RecognitionService" />
         </intent>
+        <intent>
+            <action android:name="android.speech.action.RECOGNIZE_SPEECH" />
+        </intent>
+        <package android:name="com.google.android.googlequicksearchbox" />
 
         <!-- Amazon Native Apps -->
         <package android:name="in.amazon.mShop.android.shopping" />

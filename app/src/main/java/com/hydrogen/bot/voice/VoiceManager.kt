@@ -1,5 +1,6 @@
 package com.hydrogen.bot.voice
 
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
@@ -25,74 +26,117 @@ class VoiceManager(private val context: Context, private val listener: VoiceList
     private var isCurrentlyListening = false
 
     init {
-        initRecognizerSafe()
+        ensureRecognizer()
     }
 
-    private fun initRecognizerSafe() {
-        mainHandler.post {
-            try {
-                if (SpeechRecognizer.isRecognitionAvailable(context)) {
-                    speechRecognizer?.destroy()
-                    speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
-                        setRecognitionListener(createRecognitionListener())
-                    }
-                } else {
-                    Log.w("HydrogenBot", "SpeechRecognizer not directly available on device")
+    @Synchronized
+    private fun ensureRecognizer(): SpeechRecognizer? {
+        if (speechRecognizer != null) return speechRecognizer
+
+        // 1. Check and create default SpeechRecognizer
+        try {
+            if (SpeechRecognizer.isRecognitionAvailable(context)) {
+                speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
+                    setRecognitionListener(createRecognitionListener())
                 }
-            } catch (e: Throwable) {
-                Log.e("HydrogenBot", "Error initializing SpeechRecognizer", e)
-                speechRecognizer = null
+                Log.d("HydrogenBot", "Initialized default SpeechRecognizer successfully")
+                return speechRecognizer
             }
+        } catch (e: Throwable) {
+            Log.w("HydrogenBot", "Default recognizer init failed: ${e.message}")
         }
+
+        // 2. Try explicit Google Speech Recognition component (standard on Google App)
+        try {
+            val googleComponent = ComponentName(
+                "com.google.android.googlequicksearchbox",
+                "com.google.android.voicesearch.serviceapi.GoogleRecognitionService"
+            )
+            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context, googleComponent).apply {
+                setRecognitionListener(createRecognitionListener())
+            }
+            Log.d("HydrogenBot", "Initialized Google component SpeechRecognizer")
+            return speechRecognizer
+        } catch (e: Throwable) {
+            Log.w("HydrogenBot", "Google component init failed: ${e.message}")
+        }
+
+        // 3. Last resort: direct create without availability check
+        try {
+            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
+                setRecognitionListener(createRecognitionListener())
+            }
+            Log.d("HydrogenBot", "Initialized direct SpeechRecognizer")
+            return speechRecognizer
+        } catch (e: Throwable) {
+            Log.e("HydrogenBot", "All SpeechRecognizer creation attempts failed", e)
+            speechRecognizer = null
+        }
+
+        return null
     }
 
     fun startListening() {
-        mainHandler.post {
-            try {
-                if (speechRecognizer == null) {
-                    initRecognizerSafe()
-                }
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post { startListening() }
+            return
+        }
 
-                val intent = createSpeechIntent()
+        try {
+            val recognizer = ensureRecognizer()
+            val intent = createSpeechIntent()
 
-                if (speechRecognizer != null) {
+            if (recognizer != null) {
+                try {
+                    // Cancel any stuck previous sessions
+                    recognizer.cancel()
                     isCurrentlyListening = true
-                    speechRecognizer?.startListening(intent)
+                    recognizer.startListening(intent)
                     listener.onListeningStateChanged(true)
-                } else {
-                    // Fallback to Native System Voice Dialog (100% crash-free on all Androids)
+                } catch (e: Throwable) {
+                    Log.e("HydrogenBot", "startListening exception, resetting recognizer", e)
+                    resetRecognizer()
                     listener.onRequestSystemVoiceDialog(intent)
                 }
-            } catch (e: Throwable) {
-                Log.e("HydrogenBot", "Mic start error, falling back to system dialog", e)
-                listener.onListeningStateChanged(false)
-                // Fallback to System Voice Dialog
-                listener.onRequestSystemVoiceDialog(createSpeechIntent())
+            } else {
+                listener.onRequestSystemVoiceDialog(intent)
             }
+        } catch (e: Throwable) {
+            Log.e("HydrogenBot", "startListening fatal error", e)
+            listener.onListeningStateChanged(false)
+            listener.onRequestSystemVoiceDialog(createSpeechIntent())
         }
     }
 
     fun stopListening() {
-        mainHandler.post {
-            try {
-                isCurrentlyListening = false
-                speechRecognizer?.stopListening()
-                listener.onListeningStateChanged(false)
-            } catch (e: Throwable) {
-                // Ignore safe
-            }
+        if (Looper.myLooper() != Looper.getMainLooper()) {
+            mainHandler.post { stopListening() }
+            return
+        }
+        try {
+            isCurrentlyListening = false
+            speechRecognizer?.stopListening()
+            listener.onListeningStateChanged(false)
+        } catch (e: Throwable) {
+            // Ignore
         }
     }
 
+    private fun resetRecognizer() {
+        try {
+            speechRecognizer?.destroy()
+        } catch (e: Throwable) {}
+        speechRecognizer = null
+        ensureRecognizer()
+    }
+
     fun destroy() {
-        mainHandler.post {
-            try {
-                isCurrentlyListening = false
-                speechRecognizer?.destroy()
-                speechRecognizer = null
-            } catch (e: Throwable) {
-                // Ignore safe
-            }
+        try {
+            isCurrentlyListening = false
+            speechRecognizer?.destroy()
+            speechRecognizer = null
+        } catch (e: Throwable) {
+            // Ignore
         }
     }
 
@@ -101,8 +145,9 @@ class VoiceManager(private val context: Context, private val listener: VoiceList
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, "hi-IN")
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, "hi-IN")
-            putExtra(RecognizerIntent.EXTRA_PROMPT, "Hydrogen Bot is listening… Boliye")
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+            putExtra(RecognizerIntent.EXTRA_PROMPT, "Hydrogen Bot sun raha hai… Boliye")
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
+            putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
         }
     }
 
@@ -137,16 +182,17 @@ class VoiceManager(private val context: Context, private val listener: VoiceList
                         SpeechRecognizer.ERROR_NO_MATCH -> "Kuch sunayi nahi diya, kripya dobara bolein."
                         SpeechRecognizer.ERROR_NETWORK -> "Network issue mila."
                         SpeechRecognizer.ERROR_AUDIO -> "Audio recording error."
-                        SpeechRecognizer.ERROR_CLIENT -> "Voice client issue, system dialog open ho raha hai."
-                        else -> "Voice recognition error (Code $error)."
+                        SpeechRecognizer.ERROR_CLIENT -> {
+                            resetRecognizer()
+                            "Voice ready, kripya dobara tap karein."
+                        }
+                        SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> {
+                            resetRecognizer()
+                            "Voice engine busy tha, reset ho gaya."
+                        }
+                        else -> "Voice recognition code $error."
                     }
-
-                    // On client error or engine disconnect, fall back to native system dialog
-                    if (error == SpeechRecognizer.ERROR_CLIENT || error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY) {
-                        listener.onRequestSystemVoiceDialog(createSpeechIntent())
-                    } else {
-                        listener.onVoiceError(msg)
-                    }
+                    listener.onVoiceError(msg)
                 }
             }
 

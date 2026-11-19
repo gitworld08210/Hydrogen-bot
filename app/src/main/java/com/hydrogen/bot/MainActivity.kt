@@ -230,7 +230,16 @@ class MainActivity : FragmentActivity(), VoiceListener {
         try {
             systemVoiceDialogLauncher.launch(intent)
         } catch (e: Exception) {
-            Toast.makeText(this, "Voice recognition available nahi hai.", Toast.LENGTH_SHORT).show()
+            try {
+                val webSearchIntent = Intent(RecognizerIntent.ACTION_WEB_SEARCH).apply {
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_WEB_SEARCH)
+                    putExtra(RecognizerIntent.EXTRA_PROMPT, "Hydrogen Bot: Boliye…")
+                }
+                systemVoiceDialogLauncher.launch(webSearchIntent)
+            } catch (e2: Exception) {
+                statusText = "Voice ready. Kripya dobara tap karein ya quick action chunein."
+                Toast.makeText(this, "Mic tap karein ya quick actions use karein.", Toast.LENGTH_SHORT).show()
+            }
         }
     }
 
