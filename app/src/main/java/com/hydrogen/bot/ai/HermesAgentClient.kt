@@ -58,7 +58,9 @@ class HermesAgentClient(
                {"action": "MORNING_BRIEFING", "targetApp": "Hydrogen Assistant", "query": "", "speechFeedback": "Daily briefing generate kar raha hoon."}
             3. Camera Vision:
                {"action": "CAMERA_VISION", "targetApp": "Hydrogen Vision", "query": "", "speechFeedback": "Camera open kar raha hoon."}
-            4. General Query / Conversation:
+            4. Alarm & Timer:
+               {"action": "SET_ALARM" | "SET_TIMER", "targetApp": "Clock", "query": "extracted time string", "speechFeedback": "Alarm set kar raha hoon."}
+            5. General Query / Conversation:
                {"action": "GENERAL_QUERY", "targetApp": "Hydrogen Assistant", "query": "", "speechFeedback": "Direct conversational answer in Hindi/Hinglish in 1-2 natural sentences"}
             Output strict JSON only without markdown formatting.
         """.trimIndent()

@@ -380,6 +380,26 @@ class MainActivity : FragmentActivity(), VoiceListener {
                     ttsManager.speak(intent.speechFeedback)
                     isLastNativeApp = true
                 }
+                ActionType.SET_ALARM -> {
+                    val result = AppRouter.launchSetAlarm(this@MainActivity, intent.query.ifBlank { spokenText })
+                    val feedback = if (result.success) result.message else intent.speechFeedback
+                    statusText = feedback
+                    ttsManager.speak(feedback)
+                    isLastNativeApp = result.isNativeApp
+                    if (!result.success) {
+                        Toast.makeText(this@MainActivity, result.message, Toast.LENGTH_LONG).show()
+                    }
+                }
+                ActionType.SET_TIMER -> {
+                    val result = AppRouter.launchSetTimer(this@MainActivity, intent.query.ifBlank { spokenText })
+                    val feedback = if (result.success) result.message else intent.speechFeedback
+                    statusText = feedback
+                    ttsManager.speak(feedback)
+                    isLastNativeApp = result.isNativeApp
+                    if (!result.success) {
+                        Toast.makeText(this@MainActivity, result.message, Toast.LENGTH_LONG).show()
+                    }
+                }
                 else -> {
                     ttsManager.speak(intent.speechFeedback)
                     isLastNativeApp = false

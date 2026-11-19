@@ -6,17 +6,26 @@
 [![Backend: Supabase](https://img.shields.io/badge/Backend-Supabase_Postgres-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com)
 [![Auth: Supabase & Resend](https://img.shields.io/badge/Auth-Email_OTP-000000?style=for-the-badge&logo=resend&logoColor=white)](https://supabase.com)
 [![Notifications: Firebase FCM](https://img.shields.io/badge/Notifications-Firebase_FCM-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://firebase.google.com)
-[![Latest Release](https://img.shields.io/badge/Release-v1.6_Stable-0284C7?style=for-the-badge&logo=android&logoColor=white)](https://github.com/gitworld08210/Hydrogen-bot/raw/main/release/HydrogenBot-v1.6.apk)
+[![Latest Release](https://img.shields.io/badge/Release-v1.7_Stable-0284C7?style=for-the-badge&logo=android&logoColor=white)](https://github.com/gitworld08210/Hydrogen-bot/raw/main/release/HydrogenBot-v1.7.apk)
 
 ---
 
-## 📲 Direct APK Download (v1.6 - Blinkit + Context Memory + Hermes Cloud Brain)
+## 📲 Direct APK Download (v1.7 - Native Alarm & Timer + Live Hermes Cloud Brain)
 
 Aap seedha apne Android phone me latest signed APK download aur install kar sakte hain:
 
-👉 **[Download HydrogenBot-v1.6.apk (Direct Download)](https://github.com/gitworld08210/Hydrogen-bot/raw/main/release/HydrogenBot-v1.6.apk)** *(Size: ~13.4 MB)*
+👉 **[Download HydrogenBot-v1.7.apk (Direct Download)](https://github.com/gitworld08210/Hydrogen-bot/raw/main/release/HydrogenBot-v1.7.apk)** *(Size: ~13.4 MB)*
 
-### 🆕 What's New in v1.6:
+### 🆕 What's New in v1.7:
+* ⏰ **Native System Alarm Engine (`AppRouter.launchSetAlarm`):**
+  * Fixed the bug where saying *"kal subah 5 baje ka alarm set karo"* only typed on screen and did nothing.
+  * Bot now parses the target time (hour, minute, AM/PM, Devanagari/Hinglish) and directly triggers Android's official system Clock app via `AlarmClock.ACTION_SET_ALARM` with audio confirmation!
+* ⏱️ **Countdown Timer (`AppRouter.launchSetTimer`):**
+  * Say *"10 minute ka timer lagao"* or *"5 minute timer"* — bot automatically calculates seconds and sets native system timer.
+* ☁️ **Connected to Live Hermes Cloud Brain (`https://hydrogen-bot-n382.onrender.com`):**
+  * Android app is now hard-wired to your live Render Hermes deployment.
+* 🎙️ **ElevenLabs Neural Voice TTS:**
+  * Support for human-grade real speech via ElevenLabs multilingual models with zero-latency native fallback.
 * 🛒 **Native Blinkit Integration (10-Minute Grocery Delivery):**
   * Say *"Blinkit pe dudh search karo"*, *"ब्लिंकिट पर बटर खोजो"*, or *"Blinkit kholo"* — bot directly launches official Blinkit app (`com.grofers.customerapp`) into instant search!
   * Vision Result Card now includes a dedicated quick-tap **Yellow Blinkit Button** alongside Amazon and Flipkart.

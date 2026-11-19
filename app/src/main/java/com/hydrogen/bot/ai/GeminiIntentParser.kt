@@ -127,6 +127,27 @@ class GeminiIntentParser(
             )
         }
 
+        // Native Alarm (Hindi: अलार्म, अलारम, जगा देना | English: alarm, wake me up)
+        if (clean.contains("alarm") || clean.contains("अलार्म") || clean.contains("अलारम") ||
+            clean.contains("wake me up") || clean.contains("jaga dena") || clean.contains("जगा देना")) {
+            return ParsedIntent(
+                action = ActionType.SET_ALARM,
+                targetApp = "Clock",
+                query = original,
+                speechFeedback = "Alarm set kar raha hoon."
+            )
+        }
+
+        // Native Timer (Hindi: टाइमर | English: timer)
+        if (clean.contains("timer") || clean.contains("टाइमर")) {
+            return ParsedIntent(
+                action = ActionType.SET_TIMER,
+                targetApp = "Clock",
+                query = original,
+                speechFeedback = "Timer start kar raha hoon."
+            )
+        }
+
         // Blinkit patterns (Hindi: ब्लिंकिट, ग्रोफर्स | English: blinkit, grofers, blnkit)
         if (clean.contains("blinkit") || clean.contains("ब्लिंकिट") || clean.contains("blnkit") ||
             clean.contains("blink it") || clean.contains("grofers") || clean.contains("ग्रोफर्स")) {
@@ -267,7 +288,9 @@ class GeminiIntentParser(
                {"action": "MORNING_BRIEFING", "targetApp": "Hydrogen Assistant", "query": "", "speechFeedback": "Daily briefing generate kar raha hoon."}
             3. If user wants camera or scan:
                {"action": "CAMERA_VISION", "targetApp": "Hydrogen Vision", "query": "", "speechFeedback": "Camera open kar raha hoon."}
-            4. Otherwise, for general questions, greetings, or conversation:
+            4. If user wants to set an alarm or timer:
+               {"action": "SET_ALARM" | "SET_TIMER", "targetApp": "Clock", "query": "extracted time e.g. '05:00' or '10 minutes'", "speechFeedback": "Alarm set kar raha hoon."}
+            5. Otherwise, for general questions, greetings, or conversation:
                {"action": "GENERAL_QUERY", "targetApp": "Hydrogen Assistant", "query": "", "speechFeedback": "Direct conversational answer in Hindi/Hinglish in 1-2 natural sentences"}
             Output strict JSON only.
         """.trimIndent()

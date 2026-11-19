@@ -13,6 +13,8 @@ enum class ActionType {
     DEVICE_CONTROL,
     MORNING_BRIEFING,
     CAMERA_VISION,
+    SET_ALARM,
+    SET_TIMER,
     GENERAL_QUERY
 }
 

@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.provider.AlarmClock
 
 data class LaunchResult(
     val success: Boolean,
@@ -339,6 +340,114 @@ object AppRouter {
                     message = "Phone me Blinkit app install nahi mili."
                 )
             }
+        }
+    }
+
+    /**
+     * Sets a native system alarm using Android AlarmClock API.
+     */
+    fun launchSetAlarm(context: Context, query: String): LaunchResult {
+        var hour = 5
+        var minute = 0
+        val clean = query.lowercase()
+
+        val isPm = clean.contains("pm") || clean.contains("shaam") || clean.contains("sham") ||
+                   clean.contains("raat") || clean.contains("dopahar") || clean.contains("शाम") || clean.contains("रात")
+
+        val isAm = clean.contains("am") || clean.contains("subah") || clean.contains("prabhat") || clean.contains("सुबह")
+
+        // 1. Check for HH:MM (e.g. 5:30, 06:15)
+        val colonMatch = Regex("(\\d{1,2}):(\\d{2})").find(clean)
+        if (colonMatch != null) {
+            hour = colonMatch.groupValues[1].toIntOrNull() ?: 5
+            minute = colonMatch.groupValues[2].toIntOrNull() ?: 0
+        } else {
+            // 2. Check for single numbers (e.g. 5, 6, 7)
+            val numberMatch = Regex("(\\d{1,2})").find(clean)
+            if (numberMatch != null) {
+                hour = numberMatch.groupValues[1].toIntOrNull() ?: 5
+                minute = 0
+            }
+        }
+
+        if (isPm && hour < 12) {
+            hour += 12
+        } else if (isAm && hour == 12) {
+            hour = 0
+        }
+
+        return try {
+            val intent = Intent(AlarmClock.ACTION_SET_ALARM).apply {
+                putExtra(AlarmClock.EXTRA_HOUR, hour)
+                putExtra(AlarmClock.EXTRA_MINUTES, minute)
+                putExtra(AlarmClock.EXTRA_MESSAGE, "Hydrogen Alarm")
+                putExtra(AlarmClock.EXTRA_SKIP_UI, false)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            val formattedMin = if (minute < 10) "0$minute" else "$minute"
+            val amPmStr = if (hour >= 12) "PM" else "AM"
+            val displayHour = if (hour > 12) hour - 12 else if (hour == 0) 12 else hour
+            LaunchResult(
+                success = true,
+                targetApp = "Clock",
+                isNativeApp = true,
+                message = "$displayHour:$formattedMin $amPmStr ka alarm set kar diya hai."
+            )
+        } catch (e: Exception) {
+            LaunchResult(
+                success = false,
+                targetApp = "Clock",
+                isNativeApp = false,
+                message = "Alarm set karne me error: ${e.message}"
+            )
+        }
+    }
+
+    /**
+     * Sets a native system countdown timer using Android AlarmClock API.
+     */
+    fun launchSetTimer(context: Context, query: String): LaunchResult {
+        var seconds = 60
+        val clean = query.lowercase()
+
+        val minuteMatch = Regex("(\\d+)\\s*(?:min|minute|minut|मिनट)").find(clean)
+        val secondMatch = Regex("(\\d+)\\s*(?:sec|second|sekand|सेकंड)").find(clean)
+
+        if (minuteMatch != null) {
+            val mins = minuteMatch.groupValues[1].toIntOrNull() ?: 1
+            seconds = mins * 60
+        } else if (secondMatch != null) {
+            seconds = secondMatch.groupValues[1].toIntOrNull() ?: 30
+        } else {
+            val anyNumber = Regex("(\\d+)").find(clean)
+            if (anyNumber != null) {
+                val num = anyNumber.groupValues[1].toIntOrNull() ?: 1
+                seconds = num * 60
+            }
+        }
+
+        return try {
+            val intent = Intent(AlarmClock.ACTION_SET_TIMER).apply {
+                putExtra(AlarmClock.EXTRA_LENGTH, seconds)
+                putExtra(AlarmClock.EXTRA_MESSAGE, "Hydrogen Timer")
+                putExtra(AlarmClock.EXTRA_SKIP_UI, false)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(intent)
+            LaunchResult(
+                success = true,
+                targetApp = "Clock",
+                isNativeApp = true,
+                message = "${seconds / 60} minute ka timer set kar diya hai."
+            )
+        } catch (e: Exception) {
+            LaunchResult(
+                success = false,
+                targetApp = "Clock",
+                isNativeApp = false,
+                message = "Timer set karne me error: ${e.message}"
+            )
         }
     }
 }
