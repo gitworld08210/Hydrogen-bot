@@ -12,17 +12,20 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.SmartToy
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
@@ -55,6 +58,8 @@ import kotlinx.coroutines.launch
 fun AuthScreen(
     authManager: AuthManager,
     onLoginSuccess: () -> Unit,
+    onBiometricLogin: () -> Unit = {},
+    hasSavedSession: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     var email by remember { mutableStateOf("") }
@@ -227,6 +232,30 @@ fun AuthScreen(
                             fontSize = 15.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = Color.White
+                        )
+                    }
+                }
+
+                if (hasSavedSession && !isOtpSent) {
+                    OutlinedButton(
+                        onClick = onBiometricLogin,
+                        shape = RoundedCornerShape(28.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(52.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Fingerprint,
+                            contentDescription = null,
+                            tint = SlateDark,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "Unlock with Fingerprint / Face",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = SlateDark
                         )
                     }
                 }

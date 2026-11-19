@@ -10,6 +10,8 @@ enum class ActionType {
     CAB_COMPARE,
     PAYMENT_PAUSE,
     DEVICE_CONTROL,
+    MORNING_BRIEFING,
+    CAMERA_VISION,
     GENERAL_QUERY
 }
 

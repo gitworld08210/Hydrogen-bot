@@ -1,5 +1,7 @@
 package com.hydrogen.bot.ai
 
+import android.graphics.Bitmap
+import android.util.Base64
 import android.util.Log
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -9,13 +11,21 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
 import java.util.concurrent.TimeUnit
+
+data class VisionResult(
+    val productName: String,
+    val description: String,
+    val amazonQuery: String,
+    val flipkartQuery: String
+)
 
 class GeminiIntentParser(private val apiKey: String? = null) {
 
     private val client = OkHttpClient.Builder()
-        .connectTimeout(5, TimeUnit.SECONDS)
-        .readTimeout(8, TimeUnit.SECONDS)
+        .connectTimeout(6, TimeUnit.SECONDS)
+        .readTimeout(10, TimeUnit.SECONDS)
         .build()
 
     // Mark-LVII Verified Model Ladder (Ultra-low latency first)
@@ -48,7 +58,7 @@ class GeminiIntentParser(private val apiKey: String? = null) {
             }
         }
 
-        // 3. SMART CONVERSATIONAL FALLBACK (No repetitive robotic text)
+        // 3. SMART CONVERSATIONAL FALLBACK
         val conversationalReply = when {
             cleanText.contains("kaise ho") || cleanText.contains("kaisa hai") || cleanText.contains("how are you") ->
                 "Main ekdum badhiya hoon! Bataiye, aaj main aapki kya madad karoon?"
@@ -71,6 +81,28 @@ class GeminiIntentParser(private val apiKey: String? = null) {
     }
 
     private fun parseOfflineRules(clean: String, original: String): ParsedIntent? {
+        // Morning Briefing / Battery Check
+        if (clean.contains("good morning") || clean.contains("गुड मॉर्निंग") || clean.contains("सुप्रभात") ||
+            clean.contains("briefing") || clean.contains("ब्रीफिंग") || clean.contains("battery") || clean.contains("बैटरी")) {
+            return ParsedIntent(
+                action = ActionType.MORNING_BRIEFING,
+                targetApp = "Hydrogen Assistant",
+                query = "",
+                speechFeedback = "Daily briefing generate kar raha hoon."
+            )
+        }
+
+        // Camera / Vision Scan
+        if (clean.contains("camera") || clean.contains("कैमरा") || clean.contains("photo") || clean.contains("फोटो") ||
+            clean.contains("scan") || clean.contains("स्कैन") || clean.contains("ye kya hai") || clean.contains("yeh kya hai")) {
+            return ParsedIntent(
+                action = ActionType.CAMERA_VISION,
+                targetApp = "Hydrogen Vision",
+                query = "",
+                speechFeedback = "Camera open kar raha hoon, product frame me rakhein."
+            )
+        }
+
         // YouTube patterns (Hindi: यूट्यूब, यू ट्यूब, गाना, गाने, वीडियो | English: youtube, song, video)
         if (clean.contains("youtube") || clean.contains("यूट्यूब") || clean.contains("यू ट्यूब") ||
             clean.contains("gaana") || clean.contains("गाना") || clean.contains("गाने") ||
@@ -174,7 +206,11 @@ class GeminiIntentParser(private val apiKey: String? = null) {
             The user speaks to you in Hindi, Hinglish, or English: "$spokenText".
             1. If the user wants to open or search an app (Amazon, YouTube, Flipkart, WhatsApp, IRCTC):
                {"action": "SEARCH_AMAZON" | "SEARCH_YOUTUBE" | "SEARCH_FLIPKART" | "SEND_WHATSAPP" | "BOOK_TICKET_IRCTC", "targetApp": "Amazon India" | "YouTube" | "Flipkart" | "WhatsApp" | "IRCTC", "query": "extracted clean query or empty", "speechFeedback": "Short polite Hindi confirmation (e.g. 'YouTube khol raha hoon.')"}
-            2. Otherwise, for general questions, greetings, or conversation:
+            2. If user asks for morning briefing or battery:
+               {"action": "MORNING_BRIEFING", "targetApp": "Hydrogen Assistant", "query": "", "speechFeedback": "Daily briefing generate kar raha hoon."}
+            3. If user wants camera or scan:
+               {"action": "CAMERA_VISION", "targetApp": "Hydrogen Vision", "query": "", "speechFeedback": "Camera open kar raha hoon."}
+            4. Otherwise, for general questions, greetings, or conversation:
                {"action": "GENERAL_QUERY", "targetApp": "Hydrogen Assistant", "query": "", "speechFeedback": "Direct conversational answer in Hindi/Hinglish in 1-2 natural sentences"}
             Output strict JSON only.
         """.trimIndent()
@@ -228,6 +264,91 @@ class GeminiIntentParser(private val apiKey: String? = null) {
             } catch (e: Exception) {
                 Log.w("HydrogenBot", "Model $modelName exception: ${e.message}. Stepping to next rung...")
             }
+        }
+
+        null
+    }
+
+    /**
+     * Gemini Vision Product Analyzer:
+     * Analyzes captured photo to identify product and generate Amazon & Flipkart search queries.
+     */
+    suspend fun analyzeImage(bitmap: Bitmap): VisionResult? = withContext(Dispatchers.IO) {
+        val key = apiKey?.trim() ?: ""
+        if (key.isBlank()) return@withContext null
+
+        try {
+            val maxDim = 800
+            val scale = (maxDim.toFloat() / Math.max(bitmap.width, bitmap.height)).coerceAtMost(1f)
+            val scaledBmp = Bitmap.createScaledBitmap(
+                bitmap,
+                (bitmap.width * scale).toInt(),
+                (bitmap.height * scale).toInt(),
+                true
+            )
+            val stream = ByteArrayOutputStream()
+            scaledBmp.compress(Bitmap.CompressFormat.JPEG, 80, stream)
+            val base64Img = Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
+
+            val visionPrompt = """
+                Identify the product or object in this photo.
+                Output strict JSON only:
+                {
+                  "productName": "Exact Brand and Product Name (e.g. Nike Air Max, Boat Airdopes, Fastrack Watch)",
+                  "description": "Short 1-sentence polite Hindi description",
+                  "amazonQuery": "Clean keyword to search on Amazon India",
+                  "flipkartQuery": "Clean keyword to search on Flipkart"
+                }
+            """.trimIndent()
+
+            val jsonPayload = JSONObject().apply {
+                put("contents", JSONArray().put(JSONObject().apply {
+                    put("parts", JSONArray().apply {
+                        put(JSONObject().put("text", visionPrompt))
+                        put(JSONObject().put("inline_data", JSONObject().apply {
+                            put("mime_type", "image/jpeg")
+                            put("data", base64Img)
+                        }))
+                    })
+                }))
+            }
+
+            val requestBody = jsonPayload.toString().toRequestBody("application/json".toMediaType())
+
+            for (m in modelLadder) {
+                try {
+                    val url = "https://generativelanguage.googleapis.com/v1beta/models/$m:generateContent?key=$key"
+                    val request = Request.Builder().url(url).post(requestBody).build()
+                    val response = client.newCall(request).execute()
+                    val respStr = response.body?.string() ?: ""
+
+                    if (response.isSuccessful && respStr.isNotBlank()) {
+                        val root = JSONObject(respStr)
+                        val candidates = root.optJSONArray("candidates")
+                        if (candidates != null && candidates.length() > 0) {
+                            val text = candidates.getJSONObject(0)
+                                .getJSONObject("content")
+                                .getJSONArray("parts")
+                                .getJSONObject(0)
+                                .getString("text")
+                                .replace("```json", "")
+                                .replace("```", "")
+                                .trim()
+                            val obj = JSONObject(text)
+                            return@withContext VisionResult(
+                                productName = obj.optString("productName", "Pehchana hua product"),
+                                description = obj.optString("description", "Product pehchaan liya gaya hai."),
+                                amazonQuery = obj.optString("amazonQuery", ""),
+                                flipkartQuery = obj.optString("flipkartQuery", "")
+                            )
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.w("HydrogenBot", "Vision ladder error on $m: ${e.message}")
+                }
+            }
+        } catch (e: Exception) {
+            Log.e("HydrogenBot", "Vision analysis failed", e)
         }
 
         null

@@ -1,5 +1,6 @@
 package com.hydrogen.bot.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -27,8 +28,13 @@ import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Send
 import androidx.compose.material.icons.filled.ShoppingBag
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
@@ -48,6 +54,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.hydrogen.bot.ai.ParsedIntent
+import com.hydrogen.bot.ai.VisionResult
 import com.hydrogen.bot.ui.components.ActionCard
 import com.hydrogen.bot.ui.components.HydrogenMicButton
 import com.hydrogen.bot.ui.components.OrganicSoundCapsules
@@ -73,6 +80,11 @@ fun HomeScreen(
     onMicClick: () -> Unit,
     onOpenVault: () -> Unit,
     onQuickCommandClick: (String) -> Unit,
+    onOpenVision: () -> Unit = {},
+    visionResult: VisionResult? = null,
+    onClearVision: () -> Unit = {},
+    onSearchAmazon: (String) -> Unit = {},
+    onSearchFlipkart: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     // Mode toggle between "Voice Chat" (Middle Screen) and "AI Ask" (Right Screen)
@@ -127,22 +139,46 @@ fun HomeScreen(
                 color = SlateDark
             )
 
-            // Right Circular Vault / Bag Button
-            Box(
-                modifier = Modifier
-                    .size(42.dp)
-                    .clip(CircleShape)
-                    .background(Color(0xFFF8FAFC))
-                    .border(1.dp, HairlineBorder, CircleShape)
-                    .clickable { onOpenVault() },
-                contentAlignment = Alignment.Center
+            // Right Action Icons (Camera Vision + Vault Lock)
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(
-                    imageVector = Icons.Default.Lock,
-                    contentDescription = "Vault",
-                    tint = SlateDark,
-                    modifier = Modifier.size(18.dp)
-                )
+                // Camera Vision Button
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFF8FAFC))
+                        .border(1.dp, HairlineBorder, CircleShape)
+                        .clickable { onOpenVision() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.PhotoCamera,
+                        contentDescription = "Camera Vision",
+                        tint = SlateDark,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+
+                // Circular Vault Button
+                Box(
+                    modifier = Modifier
+                        .size(42.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFF8FAFC))
+                        .border(1.dp, HairlineBorder, CircleShape)
+                        .clickable { onOpenVault() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Lock,
+                        contentDescription = "Vault",
+                        tint = SlateDark,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
             }
         }
 
@@ -159,15 +195,14 @@ fun HomeScreen(
             ) {
                 Spacer(modifier = Modifier.height(24.dp))
 
-                // The Signature 4 Organic Sound Capsules
+                // The 4 Organic Blurred Sound Capsules
                 OrganicSoundCapsules(
                     isListening = isListening,
-                    volumeRms = volumeRms
+                    volumeRms = volumeRms,
+                    modifier = Modifier.padding(vertical = 24.dp)
                 )
 
-                Spacer(modifier = Modifier.height(48.dp))
-
-                // Pill Tag Badge: "Your Assistant 3.0"
+                // Capsule Pill Badge
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(20.dp))
@@ -183,20 +218,20 @@ fun HomeScreen(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(14.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                // Headline
+                // Main Title Headline
                 Text(
                     text = "Smart Voice Assistant",
-                    fontSize = 24.sp,
+                    fontSize = 22.sp,
                     fontWeight = FontWeight.Bold,
                     color = SlateDark,
-                    textAlign = TextAlign.Center
+                    letterSpacing = (-0.5).sp
                 )
 
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(modifier = Modifier.height(6.dp))
 
-                // Subtitle
+                // Subtitle / Assistant State
                 Text(
                     text = if (isListening) "Listening in Hindi & English…" else "I'm Here To Assist You With Anything Today",
                     fontSize = 14.sp,
@@ -206,7 +241,7 @@ fun HomeScreen(
 
                 // Voice Transcript Box (If spoken)
                 if (transcriptText.isNotBlank()) {
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -223,6 +258,104 @@ fun HomeScreen(
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth()
                         )
+                    }
+                }
+
+                // Vision Result Card (If photo captured)
+                visionResult?.let { vision ->
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Card(
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFF8FAFC)),
+                        border = BorderStroke(1.dp, HairlineBorder),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PhotoCamera,
+                                        contentDescription = null,
+                                        tint = SlateDark,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Text(
+                                        text = "Hydrogen Vision Lens",
+                                        fontSize = 14.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = SlateDark
+                                    )
+                                }
+                                IconButton(
+                                    onClick = onClearVision,
+                                    modifier = Modifier.size(24.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Close",
+                                        tint = SlateMuted,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+
+                            Text(
+                                text = vision.productName,
+                                fontSize = 16.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = SlateDark
+                            )
+
+                            Text(
+                                text = vision.description,
+                                fontSize = 13.sp,
+                                color = SlateSecondary
+                            )
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                if (vision.amazonQuery.isNotBlank()) {
+                                    Button(
+                                        onClick = { onSearchAmazon(vision.amazonQuery) },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF111215)),
+                                        shape = RoundedCornerShape(20.dp),
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(42.dp)
+                                    ) {
+                                        Text("Amazon", color = Color.White, fontSize = 13.sp)
+                                    }
+                                }
+                                if (vision.flipkartQuery.isNotBlank()) {
+                                    Button(
+                                        onClick = { onSearchFlipkart(vision.flipkartQuery) },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2874F0)),
+                                        shape = RoundedCornerShape(20.dp),
+                                        modifier = Modifier
+                                            .weight(1f)
+                                            .height(42.dp)
+                                    ) {
+                                        Text("Flipkart", color = Color.White, fontSize = 13.sp)
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 
@@ -258,7 +391,7 @@ fun HomeScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    // Left: Chat Toggle Button
+                    // Left Mode Button (Chat / AI Ask)
                     Box(
                         modifier = Modifier
                             .size(46.dp)
@@ -270,33 +403,31 @@ fun HomeScreen(
                     ) {
                         Icon(
                             imageVector = Icons.Default.ChatBubbleOutline,
-                            contentDescription = "Chat",
+                            contentDescription = "Text Chat",
                             tint = SlateDark,
                             modifier = Modifier.size(20.dp)
                         )
                     }
 
-                    // Center: Black Elevated Hydrogen Mic Button
+                    // Center Hero Obsidian Mic Button with Diffused Ring
                     HydrogenMicButton(
                         isListening = isListening,
                         onClick = onMicClick
                     )
 
-                    // Right: Close Button
+                    // Right Camera Quick Action
                     Box(
                         modifier = Modifier
                             .size(46.dp)
                             .clip(CircleShape)
                             .background(CanvasWhite)
                             .border(1.dp, HairlineBorder, CircleShape)
-                            .clickable {
-                                // Reset view or cancel
-                            },
+                            .clickable { onOpenVision() },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            imageVector = Icons.Default.Close,
-                            contentDescription = "Cancel",
+                            imageVector = Icons.Default.PhotoCamera,
+                            contentDescription = "Camera Vision",
                             tint = SlateDark,
                             modifier = Modifier.size(20.dp)
                         )
@@ -304,170 +435,163 @@ fun HomeScreen(
                 }
             }
         } else {
-            // ==================== MODE 2: AI ASK / PRODUCT CURATION (SCREEN 3) ====================
+            // ==================== MODE 2: AI ASK / PRODUCT CURATION (SCREEN 3 IN REFERENCE) ====================
             Column(
                 modifier = Modifier
                     .weight(1f)
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                horizontalAlignment = Alignment.Start
             ) {
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                // Bot Greeting Bubble
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(Color(0xFFF8FAFC))
-                        .padding(horizontal = 16.dp, vertical = 12.dp)
-                ) {
-                    Text(
-                        text = "What's Your Shopping Mood Today?",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = SlateDark
-                    )
-                }
+                // Editorial Title
+                Text(
+                    text = "AI Ask",
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = SlateDark
+                )
 
-                // Category Filter Pills
+                Spacer(modifier = Modifier.height(14.dp))
+
+                // Mood / Category Pills (Scrollable Row)
                 LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth()
                 ) {
                     items(moodCategories) { cat ->
                         Box(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(20.dp))
-                                .background(Color(0xFFF8FAFC))
-                                .border(1.dp, HairlineBorder, RoundedCornerShape(20.dp))
+                                .background(if (cat == "Shoes") Color(0xFF111215) else Color(0xFFF8FAFC))
+                                .border(1.dp, if (cat == "Shoes") Color(0xFF111215) else HairlineBorder, RoundedCornerShape(20.dp))
                                 .clickable { onQuickCommandClick("Amazon pe $cat search karo") }
                                 .padding(horizontal = 16.dp, vertical = 8.dp)
                         ) {
                             Text(
                                 text = cat,
                                 fontSize = 13.sp,
-                                color = SlateDark
+                                fontWeight = FontWeight.Medium,
+                                color = if (cat == "Shoes") Color.White else SlateDark
                             )
                         }
                     }
                 }
 
-                // User Request Bubble (If query available)
-                if (transcriptText.isNotBlank()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(20.dp))
-                                .background(Color(0xFF111215))
-                                .padding(horizontal = 16.dp, vertical = 12.dp)
-                        ) {
-                            Text(
-                                text = transcriptText,
-                                fontSize = 14.sp,
-                                color = Color.White
-                            )
-                        }
-                    }
-                }
+                Spacer(modifier = Modifier.height(20.dp))
 
-                // AI Curated Products Header
-                Text(
-                    text = "AI-Curated Finds Based On Your Mood",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = SlateMuted
-                )
-
-                // 2-Column Product Cards Grid
+                // Curated 2-Column Product Cards (From reference)
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     curatedProducts.forEach { product ->
-                        Box(modifier = Modifier.weight(1f)) {
-                            ProductCard(
-                                product = product,
-                                onClick = { onQuickCommandClick("Amazon pe ${product.title} search karo") }
+                        ProductCard(
+                            product = product,
+                            onClick = {
+                                onQuickCommandClick("Amazon pe ${product.title} search karo")
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Quick Assistant Voice Chips
+                Text(
+                    text = "Quick Assistant Actions",
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = SlateDark
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+
+                val quickActions = listOf(
+                    "🌅 Good Morning Briefing",
+                    "📸 Photo Scan Product",
+                    "⚡ Check Phone Battery",
+                    "👟 Shoes on Amazon",
+                    "🎵 Arijit Singh Songs",
+                    "💬 WhatsApp Message"
+                )
+
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    quickActions.forEach { action ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(14.dp))
+                                .background(Color(0xFFF8FAFC))
+                                .border(1.dp, HairlineBorder, RoundedCornerShape(14.dp))
+                                .clickable {
+                                    val query = when {
+                                        action.contains("Good Morning") -> "Good morning"
+                                        action.contains("Photo Scan") -> { onOpenVision(); return@clickable }
+                                        action.contains("Battery") -> "battery check"
+                                        action.contains("Shoes") -> "Amazon pe running shoes"
+                                        action.contains("Songs") -> "YouTube pe Arijit Singh gaane"
+                                        action.contains("WhatsApp") -> "WhatsApp pe message"
+                                        else -> action
+                                    }
+                                    onQuickCommandClick(query)
+                                }
+                                .padding(horizontal = 16.dp, vertical = 12.dp)
+                        ) {
+                            Text(
+                                text = action,
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = SlateDark
                             )
                         }
                     }
                 }
-
-                lastIntent?.let { intent ->
-                    ActionCard(
-                        intent = intent,
-                        isNativeApp = isLastNativeApp,
-                        statusText = intent.speechFeedback
-                    )
-                }
             }
 
-            // BOTTOM PILL INPUT BAR (Screen 3 Bottom)
-            Box(
+            // Bottom Text Query Input Bar (For Typing Mode)
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp)
+                    .padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Row(
+                OutlinedTextField(
+                    value = textInput,
+                    onValueChange = { textInput = it },
+                    placeholder = { Text("Ask Hydrogen anything…", color = SlateMuted, fontSize = 14.sp) },
+                    singleLine = true,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedBorderColor = Color(0xFF111215),
+                        unfocusedBorderColor = HairlineBorder,
+                        focusedContainerColor = Color(0xFFF8FAFC),
+                        unfocusedContainerColor = CanvasWhite
+                    ),
+                    shape = RoundedCornerShape(24.dp),
+                    modifier = Modifier.weight(1f)
+                )
+
+                Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(28.dp))
-                        .background(Color(0xFFF8FAFC))
-                        .border(1.dp, HairlineBorder, RoundedCornerShape(28.dp))
-                        .padding(horizontal = 14.dp, vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.CameraAlt,
-                        contentDescription = "Camera",
-                        tint = SlateMuted,
-                        modifier = Modifier.size(20.dp)
-                    )
-
-                    Spacer(modifier = Modifier.width(10.dp))
-
-                    Icon(
-                        imageVector = Icons.Default.Mic,
-                        contentDescription = "Voice",
-                        tint = SlateMuted,
-                        modifier = Modifier
-                            .size(20.dp)
-                            .clickable { onMicClick() }
-                    )
-
-                    Spacer(modifier = Modifier.width(10.dp))
-
-                    OutlinedTextField(
-                        value = textInput,
-                        onValueChange = { textInput = it },
-                        placeholder = { Text("Type here…", fontSize = 14.sp, color = SlateMuted) },
-                        modifier = Modifier.weight(1f),
-                        singleLine = true,
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = Color.Transparent,
-                            unfocusedBorderColor = Color.Transparent,
-                            focusedContainerColor = Color.Transparent,
-                            unfocusedContainerColor = Color.Transparent
-                        )
-                    )
-
-                    IconButton(
-                        onClick = {
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF111215))
+                        .clickable {
                             if (textInput.isNotBlank()) {
                                 onQuickCommandClick(textInput)
                                 textInput = ""
                             }
-                        }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Send,
-                            contentDescription = "Send",
-                            tint = Color(0xFF111215),
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Send,
+                        contentDescription = "Send",
+                        tint = Color.White,
+                        modifier = Modifier.size(18.dp)
+                    )
                 }
             }
         }

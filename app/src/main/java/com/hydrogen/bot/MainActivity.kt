@@ -1,11 +1,15 @@
 package com.hydrogen.bot
 
 import android.Manifest
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.os.BatteryManager
 import android.os.Bundle
 import android.speech.RecognizerIntent
 import android.widget.Toast
+import androidx.fragment.app.FragmentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
@@ -13,11 +17,11 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
-import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
 import com.hydrogen.bot.ai.ActionType
 import com.hydrogen.bot.ai.GeminiIntentParser
 import com.hydrogen.bot.ai.ParsedIntent
+import com.hydrogen.bot.ai.VisionResult
 import com.hydrogen.bot.auth.AuthManager
 import com.hydrogen.bot.router.AppRouter
 import com.hydrogen.bot.security.BiometricAuthHelper
@@ -30,6 +34,10 @@ import com.hydrogen.bot.voice.TextToSpeechManager
 import com.hydrogen.bot.voice.VoiceListener
 import com.hydrogen.bot.voice.VoiceManager
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 class MainActivity : FragmentActivity(), VoiceListener {
 
@@ -48,6 +56,7 @@ class MainActivity : FragmentActivity(), VoiceListener {
     private var isLastNativeApp by mutableStateOf(false)
     private var isLoggedIn by mutableStateOf(false)
     private var currentScreen by mutableStateOf("home") // "home", "auth", "vault"
+    private var visionResult by mutableStateOf<VisionResult?>(null)
 
     // Microphone Permission Request Handler
     private val requestPermissionLauncher = registerForActivityResult(
@@ -60,7 +69,7 @@ class MainActivity : FragmentActivity(), VoiceListener {
         }
     }
 
-    // Bulletproof Native System Voice Dialog Fallback (100% crash-free)
+    // Bulletproof Native System Voice Dialog Fallback
     private val systemVoiceDialogLauncher = registerForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -68,6 +77,27 @@ class MainActivity : FragmentActivity(), VoiceListener {
             val matches = result.data?.getStringArrayListExtra(RecognizerIntent.EXTRA_RESULTS)
             if (!matches.isNullOrEmpty()) {
                 onVoiceResult(matches[0])
+            }
+        }
+    }
+
+    // Gemini Multimodal Camera Vision Launcher
+    private val takePicturePreviewLauncher = registerForActivityResult(
+        ActivityResultContracts.TakePicturePreview()
+    ) { bitmap: Bitmap? ->
+        if (bitmap != null) {
+            statusText = "Analyzing photo with Gemini Vision…"
+            ttsManager.speak("Photo scan ho rahi hai, ek second.")
+            lifecycleScope.launch {
+                val res = intentParser.analyzeImage(bitmap)
+                visionResult = res
+                if (res != null) {
+                    statusText = res.productName
+                    ttsManager.speak("${res.productName}. ${res.description}")
+                } else {
+                    statusText = "Product pehchaan nahi paaye."
+                    ttsManager.speak("Product pehchaan nahi paaye. Kripya dobara try karein.")
+                }
             }
         }
     }
@@ -94,6 +124,20 @@ class MainActivity : FragmentActivity(), VoiceListener {
                                 isLoggedIn = true
                                 currentScreen = "home"
                                 ttsManager.speak("Hydrogen Bot me aapka swaagat hai.")
+                            },
+                            hasSavedSession = authManager.currentUser.email.isNotBlank(),
+                            onBiometricLogin = {
+                                BiometricAuthHelper.promptBiometric(
+                                    activity = this@MainActivity,
+                                    onSuccess = {
+                                        isLoggedIn = true
+                                        currentScreen = "home"
+                                        ttsManager.speak("Biometric verified. Hydrogen Bot me aapka swaagat hai.")
+                                    },
+                                    onError = { err ->
+                                        Toast.makeText(this@MainActivity, err, Toast.LENGTH_SHORT).show()
+                                    }
+                                )
                             }
                         )
                     }
@@ -121,7 +165,16 @@ class MainActivity : FragmentActivity(), VoiceListener {
                             lastIntent = lastIntent,
                             isLastNativeApp = isLastNativeApp,
                             userEmail = authManager.currentUser.email.ifEmpty { "User" },
+                            visionResult = visionResult,
                             onMicClick = { toggleListening() },
+                            onOpenVision = { takePicturePreviewLauncher.launch(null) },
+                            onClearVision = { visionResult = null },
+                            onSearchAmazon = { query ->
+                                AppRouter.launchAmazonSearch(this@MainActivity, query)
+                            },
+                            onSearchFlipkart = { query ->
+                                AppRouter.launchFlipkartSearch(this@MainActivity, query)
+                            },
                             onOpenVault = {
                                 BiometricAuthHelper.promptBiometric(
                                     activity = this@MainActivity,
@@ -173,12 +226,10 @@ class MainActivity : FragmentActivity(), VoiceListener {
             lastIntent = intent
             statusText = intent.speechFeedback
 
-            // Natural voice reply
-            ttsManager.speak(intent.speechFeedback)
-
             // Autonomous Action Execution Engine
             when (intent.action) {
                 ActionType.SEARCH_AMAZON -> {
+                    ttsManager.speak(intent.speechFeedback)
                     val result = AppRouter.launchAmazonSearch(this@MainActivity, intent.query)
                     isLastNativeApp = result.isNativeApp
                     if (!result.success) {
@@ -186,21 +237,52 @@ class MainActivity : FragmentActivity(), VoiceListener {
                     }
                 }
                 ActionType.SEARCH_YOUTUBE -> {
+                    ttsManager.speak(intent.speechFeedback)
                     val result = AppRouter.launchYouTubeSearch(this@MainActivity, intent.query)
                     isLastNativeApp = result.isNativeApp
                 }
                 ActionType.SEARCH_FLIPKART -> {
+                    ttsManager.speak(intent.speechFeedback)
                     val result = AppRouter.launchFlipkartSearch(this@MainActivity, intent.query)
                     isLastNativeApp = result.isNativeApp
                 }
                 ActionType.SEND_WHATSAPP -> {
+                    ttsManager.speak(intent.speechFeedback)
                     val result = AppRouter.launchWhatsApp(this@MainActivity, intent.query)
                     isLastNativeApp = result.isNativeApp
                 }
+                ActionType.MORNING_BRIEFING -> {
+                    val bm = getSystemService(Context.BATTERY_SERVICE) as BatteryManager
+                    val batLevel = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY)
+                    val hour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+                    val greeting = when (hour) {
+                        in 5..11 -> "Shubh prabhat"
+                        in 12..16 -> "Shubh dopahar"
+                        in 17..21 -> "Shubh sandhya"
+                        else -> "Shubh ratri"
+                    }
+                    val timeStr = SimpleDateFormat("hh:mm a", Locale.getDefault()).format(Date())
+                    val batMsg = if (batLevel < 25) {
+                        "Sir, battery $batLevel% hai, kripya charger connect karein."
+                    } else {
+                        "Battery $batLevel% hai, sab theek hai."
+                    }
+                    val speech = "$greeting! Abhi time $timeStr hua hai. $batMsg Hydrogen Bot aapki har voice command ke liye taiyyar hai."
+                    statusText = speech
+                    ttsManager.speak(speech)
+                    isLastNativeApp = false
+                }
+                ActionType.CAMERA_VISION -> {
+                    ttsManager.speak(intent.speechFeedback)
+                    takePicturePreviewLauncher.launch(null)
+                    isLastNativeApp = false
+                }
                 ActionType.BOOK_TICKET_IRCTC -> {
+                    ttsManager.speak(intent.speechFeedback)
                     isLastNativeApp = true
                 }
                 else -> {
+                    ttsManager.speak(intent.speechFeedback)
                     isLastNativeApp = false
                 }
             }

@@ -216,25 +216,35 @@ object AppRouter {
     }
 
     /**
-     * Launches WhatsApp directly.
+     * Launches WhatsApp directly with optional pre-filled message text.
      */
     fun launchWhatsApp(context: Context, query: String): LaunchResult {
         val isInstalled = isAppInstalled(context, PackageRegistry.WHATSAPP_PACKAGE)
+        val cleanMsg = query.trim()
 
         return if (isInstalled) {
             try {
-                val intent = context.packageManager.getLaunchIntentForPackage(PackageRegistry.WHATSAPP_PACKAGE)?.apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                } ?: Intent(Intent.ACTION_MAIN).apply {
-                    setPackage(PackageRegistry.WHATSAPP_PACKAGE)
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                val intent = if (cleanMsg.isNotBlank()) {
+                    Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        setPackage(PackageRegistry.WHATSAPP_PACKAGE)
+                        putExtra(Intent.EXTRA_TEXT, cleanMsg)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                } else {
+                    context.packageManager.getLaunchIntentForPackage(PackageRegistry.WHATSAPP_PACKAGE)?.apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    } ?: Intent(Intent.ACTION_MAIN).apply {
+                        setPackage(PackageRegistry.WHATSAPP_PACKAGE)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
                 }
                 context.startActivity(intent)
                 LaunchResult(
                     success = true,
                     targetApp = "WhatsApp",
                     isNativeApp = true,
-                    message = "WhatsApp open kar diya hai."
+                    message = if (cleanMsg.isNotBlank()) "WhatsApp me message draft kar diya hai." else "WhatsApp open kar diya hai."
                 )
             } catch (e: Exception) {
                 LaunchResult(
