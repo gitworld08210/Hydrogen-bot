@@ -6,6 +6,20 @@
 [![Backend: Supabase](https://img.shields.io/badge/Backend-Supabase_Postgres-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com)
 [![Email: Resend](https://img.shields.io/badge/Email_OTP-Resend-000000?style=for-the-badge&logo=resend&logoColor=white)](https://resend.com)
 [![Notifications: Firebase FCM](https://img.shields.io/badge/Notifications-Firebase_FCM-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://firebase.google.com)
+[![Download APK](https://img.shields.io/badge/Download_APK-HydrogenBot--v1.1.apk-0284C7?style=for-the-badge&logo=android&logoColor=white)](https://github.com/gitworld08210/Hydrogen-bot/raw/main/release/HydrogenBot-v1.1.apk)
+
+---
+
+## 📲 Direct APK Download (v1.1 - Crash-Free & Redesigned UI)
+
+Aap seedha apne Android phone me naya APK download aur install kar sakte hain:
+
+👉 **[Download HydrogenBot-v1.1.apk (Direct Download)](https://github.com/gitworld08210/Hydrogen-bot/raw/main/release/HydrogenBot-v1.1.apk)** *(Size: ~20.3 MB)*
+
+### Phone Me Install Karne Ka Tareeqa:
+1. Upar diye gaye link par tap karke **`HydrogenBot-v1.1.apk`** download karein.
+2. File par tap karke **"Install"** dabayein.
+3. Mic button tap karein — ab zero crash hoga!
 
 ---
 
