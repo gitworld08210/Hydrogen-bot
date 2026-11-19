@@ -28,8 +28,16 @@ android {
         if (localPropertiesFile.exists()) {
             localProperties.load(FileInputStream(localPropertiesFile))
         }
-        val apiKey = localProperties.getProperty("GEMINI_API_KEY") ?: ""
-        buildConfigField("String", "GEMINI_API_KEY", "\"$apiKey\"")
+
+        val geminiKey = localProperties.getProperty("GEMINI_API_KEY") ?: ""
+        val supabaseUrl = localProperties.getProperty("SUPABASE_URL") ?: "https://your-project.supabase.co"
+        val supabaseKey = localProperties.getProperty("SUPABASE_ANON_KEY") ?: "your-anon-key"
+        val resendKey = localProperties.getProperty("RESEND_API_KEY") ?: ""
+
+        buildConfigField("String", "GEMINI_API_KEY", "\"$geminiKey\"")
+        buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
+        buildConfigField("String", "SUPABASE_ANON_KEY", "\"$supabaseKey\"")
+        buildConfigField("String", "RESEND_API_KEY", "\"$resendKey\"")
     }
 
     buildTypes {
@@ -73,10 +81,12 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.material.icons.extended)
 
-    // Firebase Cloud Suite
+    // Supabase REST & Networking
+    implementation(libs.okhttp)
+
+    // Firebase Cloud Messaging (FCM Push Notifications)
     implementation(platform(libs.firebase.bom))
-    implementation(libs.firebase.auth.ktx)
-    implementation(libs.firebase.firestore.ktx)
+    implementation(libs.firebase.messaging.ktx)
 
     // Biometrics & Security Keystore (AES-256)
     implementation(libs.androidx.biometric)

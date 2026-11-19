@@ -1,3 +1,10 @@
 # Example local.properties
 # Place your Gemini API key here (get free key at https://aistudio.google.com)
 GEMINI_API_KEY=YOUR_GEMINI_API_KEY_HERE
+
+# Supabase Configuration (Database & Storage)
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your-supabase-anon-key
+
+# Resend API Key (Email OTP delivery - get free key at https://resend.com)
+RESEND_API_KEY=re_your_resend_api_key_here
