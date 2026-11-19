@@ -35,6 +35,8 @@ android {
         val resendKey = localProperties.getProperty("RESEND_API_KEY") ?: ""
         val hermesUrl = localProperties.getProperty("HERMES_AGENT_URL") ?: ""
         val hermesKey = localProperties.getProperty("HERMES_AGENT_KEY") ?: ""
+        val elevenLabsKey = localProperties.getProperty("ELEVENLABS_API_KEY") ?: ""
+        val elevenLabsVoiceId = localProperties.getProperty("ELEVENLABS_VOICE_ID") ?: "21m00Tcm4TlvDq8ikWAM"
 
         buildConfigField("String", "GEMINI_API_KEY", "\"$geminiKey\"")
         buildConfigField("String", "SUPABASE_URL", "\"$supabaseUrl\"")
@@ -42,6 +44,8 @@ android {
         buildConfigField("String", "RESEND_API_KEY", "\"$resendKey\"")
         buildConfigField("String", "HERMES_AGENT_URL", "\"$hermesUrl\"")
         buildConfigField("String", "HERMES_AGENT_KEY", "\"$hermesKey\"")
+        buildConfigField("String", "ELEVENLABS_API_KEY", "\"$elevenLabsKey\"")
+        buildConfigField("String", "ELEVENLABS_VOICE_ID", "\"$elevenLabsVoiceId\"")
     }
 
     buildTypes {

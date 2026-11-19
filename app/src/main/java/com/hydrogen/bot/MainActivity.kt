@@ -190,7 +190,11 @@ class MainActivity : FragmentActivity(), VoiceListener {
 
         // Initialize Core Engines
         voiceManager = VoiceManager(this, this)
-        ttsManager = TextToSpeechManager(this)
+        ttsManager = TextToSpeechManager(
+            context = this,
+            elevenLabsApiKey = BuildConfig.ELEVENLABS_API_KEY,
+            voiceId = BuildConfig.ELEVENLABS_VOICE_ID
+        )
         authManager = AuthManager(this)
         vaultManager = EncryptedVaultManager(this)
 
