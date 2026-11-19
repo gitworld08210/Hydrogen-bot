@@ -1,6 +1,6 @@
 package com.hydrogen.bot.ui.components
 
-import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -39,7 +39,7 @@ fun WaveformVisualizer(
                 4.dp
             }
 
-            val animatedHeight by animateFloatAsState(
+            val animatedHeight by animateDpAsState(
                 targetValue = targetHeight,
                 animationSpec = spring(),
                 label = "waveBar$i"
