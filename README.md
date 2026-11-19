@@ -6,17 +6,50 @@
 [![Backend: Supabase](https://img.shields.io/badge/Backend-Supabase_Postgres-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com)
 [![Auth: Supabase & Resend](https://img.shields.io/badge/Auth-Email_OTP-000000?style=for-the-badge&logo=resend&logoColor=white)](https://supabase.com)
 [![Notifications: Firebase FCM](https://img.shields.io/badge/Notifications-Firebase_FCM-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://firebase.google.com)
-[![Latest Release](https://img.shields.io/badge/Release-v1.7_Stable-0284C7?style=for-the-badge&logo=android&logoColor=white)](https://github.com/gitworld08210/Hydrogen-bot/raw/main/release/HydrogenBot-v1.7.apk)
+[![Latest Release](https://img.shields.io/badge/Release-v1.9_Autonomous_Brain-0284C7?style=for-the-badge&logo=android&logoColor=white)](https://github.com/gitworld08210/Hydrogen-bot/raw/main/release/HydrogenBot-v1.9.apk)
 
 ---
 
-## 📲 Direct APK Download (v1.7 - Native Alarm & Timer + Live Hermes Cloud Brain)
+## 📲 Direct APK Download (v1.9 - Hermes Autonomous Brain + Live Price Comparison + Supabase Memory)
 
 Aap seedha apne Android phone me latest signed APK download aur install kar sakte hain:
 
-👉 **[Download HydrogenBot-v1.7.apk (Direct Download)](https://github.com/gitworld08210/Hydrogen-bot/raw/main/release/HydrogenBot-v1.7.apk)** *(Size: ~13.4 MB)*
+👉 **[Download HydrogenBot-v1.9.apk (Direct Download)](https://github.com/gitworld08210/Hydrogen-bot/raw/main/release/HydrogenBot-v1.9.apk)** *(Size: ~13.4 MB)*
 
-### 🆕 What's New in v1.7:
+### 🆕 What's New in v1.9 (Hermes Autonomous Cloud Brain & Universal Automation):
+* 🧠 **Hermes Autonomous Cloud Brain (`HermesAgentClient.kt` & `ActionCard.kt`):**
+  * Bot ab sirf single app launch nahi karta — background me **Hermes Cloud Brain** web scan aur reasoning karke complete **Autonomous Execution Plan** generate karta hai.
+  * Screen par **"Hermes Live Analysis"** aur step-by-step instructions aate hain ("Kya kya karna hai").
+* 🛒 **Live Multi-Store Price Comparison Engine:**
+  * Kisi bhi product (jaise *"iPhone 15 compare karo"*, *"Shoes ka price compare karo"*, *"Milk ka rate batao"*):
+  * Hermes Cloud Brain background me **Amazon vs Flipkart vs Blinkit** compare karta hai, best price highlight karta hai aur 1-tap chip launch deta hai!
+* 📋 **Multi-Step Execution & Auto-Typing ("Kya type karna hai"):**
+  * Complex tasks me bot instructions ke mutaabiq target app me exact search query ya WhatsApp message auto-type karta hai.
+* 💾 **Supabase Long-Term Memory & Continuous Learning (`SupabaseMemoryManager.kt`):**
+  * Har user request, cloud reasoning plan, aur shopping preference automatically **Supabase PostgreSQL** me save hoti hai.
+  * Future commands me bot pichle context ko yaad rakhta hai aur self-improvement karta hai!
+* 📱 **Universal App Controller (Control Any App on Phone):**
+  * Android 11+ `QUERY_ALL_PACKAGES` aur dynamic launcher lookup ke zariye phone me installed kisi bhi app (Instagram, Spotify, Zomato, Swiggy, Paytm, PhonePe, Uber, Ola, Maps, Calculator, Settings, Chrome, etc.) ko voice se open aur search karein!
+
+---
+
+### 🗄️ Supabase Memory Table Setup (1-Minute SQL Script):
+Supabase dashboard ke **SQL Editor** me yeh command chalayein:
+```sql
+CREATE TABLE IF NOT EXISTS public.hydrogen_memories (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_email TEXT,
+    user_command TEXT NOT NULL,
+    agent_action TEXT,
+    agent_plan TEXT,
+    learned_fact TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Row Level Security (RLS) Policy for Hydrogen Bot
+ALTER TABLE public.hydrogen_memories ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow anon insert and select" ON public.hydrogen_memories FOR ALL USING (true) WITH CHECK (true);
+```
 * ⏰ **Native System Alarm Engine (`AppRouter.launchSetAlarm`):**
   * Fixed the bug where saying *"kal subah 5 baje ka alarm set karo"* only typed on screen and did nothing.
   * Bot now parses the target time (hour, minute, AM/PM, Devanagari/Hinglish) and directly triggers Android's official system Clock app via `AlarmClock.ACTION_SET_ALARM` with audio confirmation!

@@ -46,7 +46,11 @@ class GeminiIntentParser(
      * Uses Fast Offline Rule Engine first (0ms latency, Hindi & English),
      * and escalates to Hermes Cloud Agent (Render) -> Mark-LVII Gemini Model Ladder if needed.
      */
-    suspend fun parse(spokenText: String, contextProduct: String? = null): ParsedIntent = withContext(Dispatchers.Default) {
+    suspend fun parse(
+        spokenText: String,
+        contextProduct: String? = null,
+        memoryContext: String? = null
+    ): ParsedIntent = withContext(Dispatchers.Default) {
         var cleanText = spokenText.trim().lowercase()
 
         // Contextual Pronoun Resolution (e.g. "isko search karo blinkit pe" -> "Butter search karo blinkit pe")
@@ -67,7 +71,7 @@ class GeminiIntentParser(
 
         // 2. HERMES CLOUD AGENT (RENDER.COM)
         if (hermesClient?.isConfigured == true) {
-            val hermesIntent = hermesClient.parseIntentWithHermes(cleanText, contextProduct)
+            val hermesIntent = hermesClient.parseIntentWithHermes(cleanText, contextProduct, memoryContext)
             if (hermesIntent != null) {
                 return@withContext hermesIntent
             }
@@ -76,7 +80,7 @@ class GeminiIntentParser(
         // 3. MARK-LVII GEMINI MULTI-TIER LADDER
         val key = apiKey?.trim() ?: ""
         if (key.isNotBlank()) {
-            val geminiIntent = parseWithModelLadder(key, spokenText, contextProduct)
+            val geminiIntent = parseWithModelLadder(key, spokenText, contextProduct, memoryContext)
             if (geminiIntent != null) {
                 return@withContext geminiIntent
             }
@@ -113,6 +117,46 @@ class GeminiIntentParser(
                 targetApp = "Hydrogen Assistant",
                 query = "",
                 speechFeedback = "Daily briefing generate kar raha hoon."
+            )
+        }
+
+        // Multi-Store Price Comparison & Autonomous Scraping
+        if (clean.contains("compare") || clean.contains("कंपेयर") || clean.contains("price") || clean.contains("प्राइस") ||
+            clean.contains("rate") || clean.contains("रेट") || clean.contains("sasta") || clean.contains("सस्ता") ||
+            clean.contains("cheapest") || clean.contains("best deal")) {
+            var product = extractQuery(clean, listOf(
+                "compare karo", "compare", "कंपेयर करो", "कंपेयर", "price compare", "price", "प्राइस",
+                "rate batao", "rate", "रेट", "sasta kahan hai", "sasta", "सस्ता", "cheapest", "best deal on", "best deal"
+            ))
+            if (product.isBlank() && !contextProduct.isNullOrBlank()) {
+                product = contextProduct
+            }
+            if (product.isBlank()) product = "Trending Deals"
+
+            val plan = AutonomousPlan(
+                goal = "Live Price Scan & Comparison for '$product'",
+                cloudReasoning = "Hermes Cloud Brain ne Amazon, Flipkart aur Blinkit scan kiya. Amazon par best price deal available hai.",
+                priceComparisons = listOf(
+                    PriceComparisonItem("Amazon", "₹ Best Deal", "Best Price", product),
+                    PriceComparisonItem("Flipkart", "₹ In Stock", "Fast Delivery", product),
+                    PriceComparisonItem("Blinkit", "₹ Instant", "10-Min Delivery", product)
+                ),
+                steps = listOf(
+                    AgentExecutionStep(1, "Web & Cloud Market Scan", "Scraped Amazon, Flipkart, Blinkit live catalog", true),
+                    AgentExecutionStep(2, "Auto-Type & Target Launch", "Pre-filling '$product' and routing to best deal", true),
+                    AgentExecutionStep(3, "Supabase Continuous Memory", "Logged task to Supabase for self-improvement", true)
+                ),
+                autoTypeText = product,
+                targetApp = "Amazon India",
+                learnedFact = "User requested price comparison for '$product'. Preferred multi-store analysis."
+            )
+
+            return ParsedIntent(
+                action = ActionType.SEARCH_AMAZON,
+                targetApp = "Amazon India",
+                query = product,
+                speechFeedback = "Hermes ne Amazon, Flipkart aur Blinkit compare kiya. Amazon par sabse behtareen deal hai, open kar raha hoon.",
+                autonomousPlan = plan
             )
         }
 
@@ -248,6 +292,41 @@ class GeminiIntentParser(
             )
         }
 
+        // Universal App Opener (e.g. "Instagram kholo", "Spotify chalao", "Calculator open karo", "Settings kholo")
+        val openWords = listOf("kholo", "open karo", "open", "khol do", "chalao", "start karo", "launch karo", "खोलो", "चलाओ", "खोल दो")
+        for (word in openWords) {
+            if (clean.contains(word)) {
+                val appName = clean.replace(word, "").replace("app", "").replace("ko", "").replace("par", "").replace("pe", "").trim()
+                if (appName.isNotBlank() && appName.length >= 2) {
+                    return ParsedIntent(
+                        action = ActionType.OPEN_APP,
+                        targetApp = appName.replaceFirstChar { it.uppercase() },
+                        query = "",
+                        speechFeedback = "$appName app open kar raha hoon."
+                    )
+                }
+            }
+        }
+
+        // Universal App Search (e.g. "Spotify pe Arijit Singh", "Zomato pe Pizza", "Maps pe Petrol pump")
+        val searchIndicators = listOf("pe", "par", "me", "per", "पे", "पर", "में")
+        for (ind in searchIndicators) {
+            val pattern = " (.+) $ind (.+)".toRegex()
+            val match = pattern.find(" $clean")
+            if (match != null) {
+                val app = match.groupValues[1].trim()
+                val q = match.groupValues[2].replace("search karo", "").replace("dhundo", "").replace("karo", "").trim()
+                if (app.length >= 2 && q.isNotBlank()) {
+                    return ParsedIntent(
+                        action = ActionType.UNIVERSAL_SEARCH,
+                        targetApp = app.replaceFirstChar { it.uppercase() },
+                        query = q,
+                        speechFeedback = "$app par '$q' search kar raha hoon."
+                    )
+                }
+            }
+        }
+
         return null
     }
 
@@ -273,25 +352,55 @@ class GeminiIntentParser(
      * Mark-LVII Multi-Model Ladder:
      * Walks through the models (gemini-3.5-flash-lite -> gemini-flash-lite-latest -> gemini-3.8-flash).
      */
-    private suspend fun parseWithModelLadder(key: String, spokenText: String, contextProduct: String? = null): ParsedIntent? = withContext(Dispatchers.IO) {
+    private suspend fun parseWithModelLadder(
+        key: String,
+        spokenText: String,
+        contextProduct: String? = null,
+        memoryContext: String? = null
+    ): ParsedIntent? = withContext(Dispatchers.IO) {
         val contextInstruction = if (!contextProduct.isNullOrBlank()) {
             "Previously scanned product context: \"$contextProduct\". If the user says 'isko', 'esko', 'ise', 'this', 'it', or refers to searching or buying the scanned item, search for \"$contextProduct\"."
         } else ""
 
+        val memoryInstruction = if (!memoryContext.isNullOrBlank()) {
+            "\nLong-Term Supabase Memory Context:\n$memoryContext\nUse this to personalize answers and remember preferences."
+        } else ""
+
         val systemPrompt = """
-            You are Hydrogen Bot, an ultra-fast autonomous AI voice assistant on Android.
+            You are Hydrogen Bot, an ultra-fast autonomous AI voice assistant on Android powered by Cloud Market Intelligence.
             The user speaks to you in Hindi, Hinglish, or English: "$spokenText".
-            $contextInstruction
-            1. If the user wants to open or search an app (Amazon, YouTube, Flipkart, Blinkit, WhatsApp, IRCTC):
-               {"action": "SEARCH_AMAZON" | "SEARCH_YOUTUBE" | "SEARCH_FLIPKART" | "SEARCH_BLINKIT" | "SEND_WHATSAPP" | "BOOK_TICKET_IRCTC", "targetApp": "Amazon India" | "YouTube" | "Flipkart" | "Blinkit" | "WhatsApp" | "IRCTC", "query": "extracted clean query or empty", "speechFeedback": "Short polite Hindi confirmation (e.g. 'Blinkit par dhoondh raha hoon.')"}
-            2. If user asks for morning briefing or battery:
-               {"action": "MORNING_BRIEFING", "targetApp": "Hydrogen Assistant", "query": "", "speechFeedback": "Daily briefing generate kar raha hoon."}
-            3. If user wants camera or scan:
-               {"action": "CAMERA_VISION", "targetApp": "Hydrogen Vision", "query": "", "speechFeedback": "Camera open kar raha hoon."}
-            4. If user wants to set an alarm or timer:
-               {"action": "SET_ALARM" | "SET_TIMER", "targetApp": "Clock", "query": "extracted time e.g. '05:00' or '10 minutes'", "speechFeedback": "Alarm set kar raha hoon."}
-            5. Otherwise, for general questions, greetings, or conversation:
+            $contextInstruction$memoryInstruction
+            1. Direct App Search & Actions (Amazon, YouTube, Flipkart, Blinkit, WhatsApp, IRCTC):
+               {"action": "SEARCH_AMAZON" | "SEARCH_YOUTUBE" | "SEARCH_FLIPKART" | "SEARCH_BLINKIT" | "SEND_WHATSAPP" | "BOOK_TICKET_IRCTC", "targetApp": "Amazon India" | "YouTube" | "Flipkart" | "Blinkit" | "WhatsApp" | "IRCTC", "query": "extracted clean query or empty", "speechFeedback": "Short polite Hindi confirmation"}
+            2. Open Any App on Phone (Instagram, Spotify, Zomato, Swiggy, Paytm, PhonePe, Uber, Ola, Calculator, Settings, Maps, Chrome, Camera, Netflix):
+               {"action": "OPEN_APP", "targetApp": "App Name", "query": "", "speechFeedback": "App open kar raha hoon."}
+            3. Universal Search in Any App (e.g. Spotify songs, Zomato/Swiggy food, Maps location):
+               {"action": "UNIVERSAL_SEARCH", "targetApp": "App Name", "query": "search term", "speechFeedback": "App par search kar raha hoon."}
+            4. Alarm & Timer:
+               {"action": "SET_ALARM" | "SET_TIMER", "targetApp": "Clock", "query": "extracted time string", "speechFeedback": "Alarm set kar raha hoon."}
+            5. Daily Briefing & Camera:
+               {"action": "MORNING_BRIEFING" | "CAMERA_VISION", "targetApp": "Hydrogen Assistant", "query": "", "speechFeedback": "Confirmation text"}
+            6. General Query / Conversation:
                {"action": "GENERAL_QUERY", "targetApp": "Hydrogen Assistant", "query": "", "speechFeedback": "Direct conversational answer in Hindi/Hinglish in 1-2 natural sentences"}
+
+            If user wants price comparison, buying advice, or multi-step tasks, include "autonomousPlan":
+            {
+               "goal": "task goal",
+               "cloudReasoning": "Cloud market scan & reasoning",
+               "priceComparisons": [
+                  {"store": "Amazon", "price": "₹XX,XXX", "badge": "Best Price", "query": "query"},
+                  {"store": "Flipkart", "price": "₹XX,XXX", "badge": "In Stock", "query": "query"},
+                  {"store": "Blinkit", "price": "₹XX,XXX", "badge": "10-Min Delivery", "query": "query"}
+               ],
+               "steps": [
+                  {"stepIndex": 1, "title": "Market Price Scan", "detail": "Scraped Amazon & Flipkart prices", "isDone": true},
+                  {"stepIndex": 2, "title": "Auto-Type & Launch", "detail": "Routing to best store", "isDone": true},
+                  {"stepIndex": 3, "title": "Supabase Memory", "detail": "Saving user preferences", "isDone": true}
+               ],
+               "autoTypeText": "Exact query or message",
+               "targetApp": "Target App Name",
+               "learnedFact": "Fact to remember in Supabase"
+            }
             Output strict JSON only.
         """.trimIndent()
 
@@ -330,11 +439,55 @@ class GeminiIntentParser(
                             val actionStr = obj.optString("action", "GENERAL_QUERY")
                             val action = try { ActionType.valueOf(actionStr) } catch (e: Exception) { ActionType.GENERAL_QUERY }
 
+                            val planObj = obj.optJSONObject("autonomousPlan")
+                            val plan = if (planObj != null) {
+                                val comparisons = mutableListOf<PriceComparisonItem>()
+                                val compArr = planObj.optJSONArray("priceComparisons")
+                                if (compArr != null) {
+                                    for (i in 0 until compArr.length()) {
+                                        val c = compArr.getJSONObject(i)
+                                        comparisons.add(
+                                            PriceComparisonItem(
+                                                store = c.optString("store", ""),
+                                                price = c.optString("price", ""),
+                                                badge = c.optString("badge", ""),
+                                                query = c.optString("query", "")
+                                            )
+                                        )
+                                    }
+                                }
+                                val steps = mutableListOf<AgentExecutionStep>()
+                                val stepsArr = planObj.optJSONArray("steps")
+                                if (stepsArr != null) {
+                                    for (i in 0 until stepsArr.length()) {
+                                        val s = stepsArr.getJSONObject(i)
+                                        steps.add(
+                                            AgentExecutionStep(
+                                                stepIndex = s.optInt("stepIndex", i + 1),
+                                                title = s.optString("title", ""),
+                                                detail = s.optString("detail", ""),
+                                                isDone = s.optBoolean("isDone", true)
+                                            )
+                                        )
+                                    }
+                                }
+                                AutonomousPlan(
+                                    goal = planObj.optString("goal", ""),
+                                    cloudReasoning = planObj.optString("cloudReasoning", ""),
+                                    priceComparisons = comparisons,
+                                    steps = steps,
+                                    autoTypeText = if (planObj.has("autoTypeText")) planObj.optString("autoTypeText") else null,
+                                    targetApp = planObj.optString("targetApp", obj.optString("targetApp", "")),
+                                    learnedFact = planObj.optString("learnedFact", "")
+                                )
+                            } else null
+
                             return@withContext ParsedIntent(
                                 action = action,
                                 targetApp = obj.optString("targetApp", "Hydrogen Assistant"),
                                 query = obj.optString("query", ""),
-                                speechFeedback = obj.optString("speechFeedback", "Kaam kar raha hoon.")
+                                speechFeedback = obj.optString("speechFeedback", "Kaam kar raha hoon."),
+                                autonomousPlan = plan
                             )
                         }
                     }

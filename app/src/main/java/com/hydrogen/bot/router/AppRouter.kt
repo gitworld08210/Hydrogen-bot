@@ -450,4 +450,162 @@ object AppRouter {
             )
         }
     }
+
+    /**
+     * Universal App Launcher: Launches ANY installed app on the phone by name or package match.
+     */
+    fun launchAppByName(context: Context, appName: String): LaunchResult {
+        val pm = context.packageManager
+        val cleanName = appName.trim().lowercase()
+
+        // 1. Direct package map for top popular apps in India
+        val knownPackages = mapOf(
+            "instagram" to listOf("com.instagram.android"),
+            "spotify" to listOf("com.spotify.music"),
+            "zomato" to listOf("com.application.zomato"),
+            "swiggy" to listOf("in.swiggy.android"),
+            "uber" to listOf("com.ubercab"),
+            "ola" to listOf("com.olacabs.customer"),
+            "paytm" to listOf("net.one97.paytm"),
+            "phonepe" to listOf("com.phonepe.app"),
+            "gpay" to listOf("com.google.android.apps.nbu.paisa.user"),
+            "google pay" to listOf("com.google.android.apps.nbu.paisa.user"),
+            "maps" to listOf("com.google.android.apps.maps"),
+            "google maps" to listOf("com.google.android.apps.maps"),
+            "calculator" to listOf("com.google.android.calculator", "com.sec.android.app.popupcalculator", "com.coloros.calculator"),
+            "settings" to listOf("com.android.settings"),
+            "chrome" to listOf("com.android.chrome"),
+            "gmail" to listOf("com.google.android.gm"),
+            "telegram" to listOf("org.telegram.messenger"),
+            "snapchat" to listOf("com.snapchat.android"),
+            "twitter" to listOf("com.twitter.android"),
+            "x" to listOf("com.twitter.android"),
+            "netflix" to listOf("com.netflix.mediaclient"),
+            "hotstar" to listOf("in.startv.hotstar"),
+            "jiocinema" to listOf("com.jio.media.ondemand"),
+            "play store" to listOf("com.android.vending"),
+            "clock" to listOf("com.google.android.deskclock", "com.sec.android.app.clockpackage", "com.coloros.alarmclock"),
+            "camera" to listOf("com.google.android.GoogleCamera", "com.android.camera"),
+            "gallery" to listOf("com.google.android.apps.photos", "com.sec.android.gallery3d", "com.coloros.gallery3d"),
+            "photos" to listOf("com.google.android.apps.photos"),
+            "files" to listOf("com.google.android.apps.nbu.files")
+        )
+
+        for ((name, pkgList) in knownPackages) {
+            if (cleanName.contains(name) || name.contains(cleanName)) {
+                for (pkg in pkgList) {
+                    if (isAppInstalled(context, pkg)) {
+                        val intent = pm.getLaunchIntentForPackage(pkg)
+                        if (intent != null) {
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            context.startActivity(intent)
+                            return LaunchResult(true, name.replaceFirstChar { it.uppercase() }, true, "$name app open kar diya hai.")
+                        }
+                    }
+                }
+            }
+        }
+
+        // 2. Dynamic scan across ALL installed applications on device
+        try {
+            val installedApps = pm.getInstalledApplications(PackageManager.GET_META_DATA)
+            for (appInfo in installedApps) {
+                val label = pm.getApplicationLabel(appInfo).toString().lowercase()
+                if (label.contains(cleanName) || cleanName.contains(label)) {
+                    val intent = pm.getLaunchIntentForPackage(appInfo.packageName)
+                    if (intent != null) {
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        context.startActivity(intent)
+                        val displayLabel = pm.getApplicationLabel(appInfo).toString()
+                        return LaunchResult(true, displayLabel, true, "$displayLabel open kar diya hai.")
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            // Dynamic scan fallback
+        }
+
+        return LaunchResult(false, appName, false, "Phone me '$appName' app nahi mili.")
+    }
+
+    /**
+     * Universal Search Engine: Deep-links search query into specific apps or Google search fallback.
+     */
+    fun launchUniversalSearch(context: Context, appName: String, query: String): LaunchResult {
+        val cleanApp = appName.trim().lowercase()
+        val cleanQuery = query.trim()
+
+        // 1. Google Maps search
+        if (cleanApp.contains("map") || cleanApp.contains("नक्शा")) {
+            return try {
+                val gmmIntentUri = Uri.parse("geo:0,0?q=${Uri.encode(cleanQuery)}")
+                val mapIntent = Intent(Intent.ACTION_VIEW, gmmIntentUri).apply {
+                    setPackage("com.google.android.apps.maps")
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(mapIntent)
+                LaunchResult(true, "Google Maps", true, "Google Maps par '$cleanQuery' search kar diya hai.")
+            } catch (e: Exception) {
+                try {
+                    context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/maps/search/?api=1&query=${Uri.encode(cleanQuery)}")).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    })
+                    LaunchResult(true, "Google Maps", false, "Maps par search open kar diya hai.")
+                } catch (ex: Exception) {
+                    LaunchResult(false, "Google Maps", false, "Maps open nahi ho saka.")
+                }
+            }
+        }
+
+        // 2. Spotify Search
+        if (cleanApp.contains("spotify") || cleanApp.contains("स्पॉटिफ़ाई")) {
+            return try {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("spotify:search:${Uri.encode(cleanQuery)}")).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+                LaunchResult(true, "Spotify", true, "Spotify par '$cleanQuery' search kar diya hai.")
+            } catch (e: Exception) {
+                launchAppByName(context, "spotify")
+            }
+        }
+
+        // 3. Zomato Search
+        if (cleanApp.contains("zomato") || cleanApp.contains("ज़ोमैटो")) {
+            return try {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("zomato://search?q=${Uri.encode(cleanQuery)}")).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+                LaunchResult(true, "Zomato", true, "Zomato par '$cleanQuery' search kar diya hai.")
+            } catch (e: Exception) {
+                launchAppByName(context, "zomato")
+            }
+        }
+
+        // 4. Swiggy Search
+        if (cleanApp.contains("swiggy") || cleanApp.contains("स्विगी")) {
+            return try {
+                val intent = Intent(Intent.ACTION_VIEW, Uri.parse("swiggy://search?q=${Uri.encode(cleanQuery)}")).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(intent)
+                LaunchResult(true, "Swiggy", true, "Swiggy par '$cleanQuery' search kar diya hai.")
+            } catch (e: Exception) {
+                launchAppByName(context, "swiggy")
+            }
+        }
+
+        // 5. Default Universal Web / Google Search fallback
+        return try {
+            val searchIntent = Intent(Intent.ACTION_WEB_SEARCH).apply {
+                putExtra(android.app.SearchManager.QUERY, if (cleanApp.isNotBlank()) "$cleanApp $cleanQuery" else cleanQuery)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+            context.startActivity(searchIntent)
+            LaunchResult(true, "Search", false, "'$cleanApp $cleanQuery' search kar raha hoon.")
+        } catch (e: Exception) {
+            launchAppByName(context, cleanApp)
+        }
+    }
 }

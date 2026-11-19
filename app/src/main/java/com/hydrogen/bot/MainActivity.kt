@@ -36,6 +36,7 @@ import com.hydrogen.bot.voice.TextToSpeechManager
 import com.hydrogen.bot.voice.VoiceListener
 import com.hydrogen.bot.voice.VoiceManager
 import kotlinx.coroutines.launch
+import com.hydrogen.bot.data.SupabaseMemoryManager
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -47,6 +48,7 @@ class MainActivity : FragmentActivity(), VoiceListener {
     private lateinit var ttsManager: TextToSpeechManager
     private lateinit var authManager: AuthManager
     private lateinit var vaultManager: EncryptedVaultManager
+    private lateinit var memoryManager: SupabaseMemoryManager
     private val intentParser by lazy {
         GeminiIntentParser(
             apiKey = BuildConfig.GEMINI_API_KEY,
@@ -197,6 +199,7 @@ class MainActivity : FragmentActivity(), VoiceListener {
         )
         authManager = AuthManager(this)
         vaultManager = EncryptedVaultManager(this)
+        memoryManager = SupabaseMemoryManager(this)
 
         isLoggedIn = authManager.currentUser.isLoggedIn
         currentScreen = if (isLoggedIn) "home" else "auth"
@@ -311,11 +314,15 @@ class MainActivity : FragmentActivity(), VoiceListener {
     }
 
     private fun processSpokenCommand(spokenText: String) {
-        statusText = "Hydrogen is reasoning…"
+        statusText = "Hermes Cloud Brain is reasoning…"
         lifecycleScope.launch {
-            val intent = intentParser.parse(spokenText, visionResult?.productName)
+            val memoryContext = memoryManager.getRecentMemoryContext()
+            val intent = intentParser.parse(spokenText, visionResult?.productName, memoryContext)
             lastIntent = intent
             statusText = intent.speechFeedback
+
+            // Autonomous Memory Sync: Saves task, plan, and learned preferences into Supabase PostgreSQL
+            memoryManager.recordInteraction(authManager.currentUser.email, spokenText, intent)
 
             // Autonomous Action Execution Engine
             when (intent.action) {
@@ -379,6 +386,22 @@ class MainActivity : FragmentActivity(), VoiceListener {
                 ActionType.BOOK_TICKET_IRCTC -> {
                     ttsManager.speak(intent.speechFeedback)
                     isLastNativeApp = true
+                }
+                ActionType.OPEN_APP -> {
+                    ttsManager.speak(intent.speechFeedback)
+                    val result = AppRouter.launchAppByName(this@MainActivity, intent.targetApp)
+                    isLastNativeApp = result.isNativeApp
+                    if (!result.success) {
+                        Toast.makeText(this@MainActivity, result.message, Toast.LENGTH_LONG).show()
+                    }
+                }
+                ActionType.UNIVERSAL_SEARCH -> {
+                    ttsManager.speak(intent.speechFeedback)
+                    val result = AppRouter.launchUniversalSearch(this@MainActivity, intent.targetApp, intent.query)
+                    isLastNativeApp = result.isNativeApp
+                    if (!result.success) {
+                        Toast.makeText(this@MainActivity, result.message, Toast.LENGTH_LONG).show()
+                    }
                 }
                 ActionType.SET_ALARM -> {
                     val result = AppRouter.launchSetAlarm(this@MainActivity, intent.query.ifBlank { spokenText })

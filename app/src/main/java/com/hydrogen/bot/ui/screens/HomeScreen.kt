@@ -453,7 +453,15 @@ fun HomeScreen(
                         ActionCard(
                             intent = intent,
                             isNativeApp = isLastNativeApp,
-                            statusText = intent.speechFeedback
+                            statusText = intent.speechFeedback,
+                            onStoreClick = { store, query ->
+                                when (store.lowercase()) {
+                                    "amazon" -> onSearchAmazon(query)
+                                    "flipkart" -> onSearchFlipkart(query)
+                                    "blinkit" -> onSearchBlinkit(query)
+                                    else -> onSearchAmazon(query)
+                                }
+                            }
                         )
                     }
                 }
