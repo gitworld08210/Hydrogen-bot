@@ -257,6 +257,30 @@ class GeminiIntentParser(
             )
         }
 
+        // 8. On-Demand AI Persona Auto-Reply ("Isko reply do", "Reply de do", "Rohan ko reply do")
+        if (clean.contains("reply do") || clean.contains("reply de do") || clean.contains("reply karo") ||
+            clean.contains("reply kar do") || clean.contains("रिप्लाई दो") || clean.contains("रिप्लाई कर दो") ||
+            clean.contains("isko bata do") || clean.contains("jawab do") || clean.contains("जवाब दो")) {
+            val targetName = clean
+                .replace("isko reply do", "")
+                .replace("reply de do", "")
+                .replace("reply do", "")
+                .replace("reply kar do", "")
+                .replace("reply karo", "")
+                .replace("ko reply", "")
+                .replace("ko", "")
+                .replace("pe", "")
+                .replace("par", "")
+                .trim()
+
+            return ParsedIntent(
+                action = ActionType.AI_AUTO_REPLY,
+                targetApp = "Chat Representative",
+                query = targetName,
+                speechFeedback = if (targetName.isNotBlank()) "$targetName ko aapke style me reply taiyyar kar raha hoon." else "Aapke style me intelligent reply generate kar raha hoon."
+            )
+        }
+
         // Camera / Vision Scan
         if (clean.contains("camera") || clean.contains("कैमरा") || clean.contains("photo") || clean.contains("फोटो") ||
             clean.contains("scan") || clean.contains("स्कैन") || clean.contains("ye kya hai") || clean.contains("yeh kya hai")) {
@@ -804,5 +828,79 @@ class GeminiIntentParser(
         }
 
         null
+    }
+
+    /**
+     * Autonomous Persona Chat Drafter:
+     * Takes incoming message + sender context and drafts an authentic reply matching user's persona.
+     */
+    suspend fun generatePersonaReply(
+        incomingSender: String,
+        incomingMessage: String,
+        personaPrompt: String
+    ): String = withContext(Dispatchers.IO) {
+        val promptText = """
+Incoming chat message from $incomingSender: "$incomingMessage"
+
+$personaPrompt
+
+Draft a single direct response as the user. Return strictly the reply text, no quotes, no metadata.
+""".trimIndent()
+
+        // 1. Try Hermes Cloud Brain (Render)
+        if (hermesClient?.isConfigured == true) {
+            try {
+                val hermesIntent = hermesClient.parseIntentWithHermes(promptText, null, null)
+                if (hermesIntent != null && hermesIntent.speechFeedback.isNotBlank()) {
+                    return@withContext hermesIntent.speechFeedback.trim().removeSurrounding("\"")
+                }
+            } catch (e: Exception) {
+                Log.w("GeminiIntentParser", "Hermes persona draft fallback: ${e.message}")
+            }
+        }
+
+        // 2. Try Gemini Model Ladder
+        val key = apiKey?.trim() ?: ""
+        if (key.isNotBlank()) {
+            val jsonPayload = JSONObject().apply {
+                put("contents", JSONArray().put(JSONObject().apply {
+                    put("parts", JSONArray().put(JSONObject().apply {
+                        put("text", promptText)
+                    }))
+                }))
+            }
+            val requestBody = jsonPayload.toString().toRequestBody("application/json".toMediaType())
+            for (model in modelLadder) {
+                try {
+                    val url = "https://generativelanguage.googleapis.com/v1beta/models/$model:generateContent?key=$key"
+                    val req = Request.Builder().url(url).post(requestBody).build()
+                    val resp = client.newCall(req).execute()
+                    val respStr = resp.body?.string() ?: ""
+                    if (resp.isSuccessful && respStr.isNotBlank()) {
+                        val candidates = JSONObject(respStr).optJSONArray("candidates")
+                        val text = candidates?.optJSONObject(0)
+                            ?.optJSONObject("content")
+                            ?.optJSONArray("parts")
+                            ?.optJSONObject(0)
+                            ?.optString("text")
+                        if (!text.isNullOrBlank()) {
+                            return@withContext text.trim().removeSurrounding("\"")
+                        }
+                    }
+                } catch (e: Exception) {
+                    // try next model
+                }
+            }
+        }
+
+        // 3. Natural Fallback
+        val lower = incomingMessage.lowercase()
+        when {
+            lower.contains("kahan") || lower.contains("where") -> "Thoda busy hoon bhai, shaam ko milte hain"
+            lower.contains("kab") || lower.contains("when") -> "Thodi der me batata hoon"
+            lower.contains("chalna") || lower.contains("chalega") -> "Haan chalte hain na shaam ko!"
+            lower.contains("kaisa") || lower.contains("how are") -> "Sab badhiya bhai, tu bata kya haal hai"
+            else -> "Haan bhai, theek hai"
+        }
     }
 }

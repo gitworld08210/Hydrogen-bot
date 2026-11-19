@@ -37,6 +37,12 @@ import com.hydrogen.bot.voice.VoiceListener
 import com.hydrogen.bot.voice.VoiceManager
 import com.hydrogen.bot.services.HydrogenAccessibilityService
 import com.hydrogen.bot.services.FloatingJarvisService
+import com.hydrogen.bot.notification.HydrogenNotificationListener
+import com.hydrogen.bot.notification.IncomingChat
+import com.hydrogen.bot.data.ChatPersonaManager
+import com.hydrogen.bot.data.ChatPersona
+import com.hydrogen.bot.ai.AgentExecutionStep
+import com.hydrogen.bot.ai.AutonomousPlan
 import kotlinx.coroutines.launch
 import com.hydrogen.bot.data.SupabaseMemoryManager
 import java.text.SimpleDateFormat
@@ -51,6 +57,7 @@ class MainActivity : FragmentActivity(), VoiceListener {
     private lateinit var authManager: AuthManager
     private lateinit var vaultManager: EncryptedVaultManager
     private lateinit var memoryManager: SupabaseMemoryManager
+    private lateinit var personaManager: ChatPersonaManager
     private val intentParser by lazy {
         GeminiIntentParser(
             apiKey = BuildConfig.GEMINI_API_KEY,
@@ -71,6 +78,37 @@ class MainActivity : FragmentActivity(), VoiceListener {
     private var visionResult by mutableStateOf<VisionResult?>(null)
     private var isAccessibilityEnabled by mutableStateOf(false)
     private var isFloatingOrbActive by mutableStateOf(false)
+    private var isNotificationAccessGranted by mutableStateOf(false)
+    private var incomingChat by mutableStateOf<IncomingChat?>(null)
+    private var personaProfile by mutableStateOf<ChatPersona?>(null)
+
+    // Chat Export File Picker Launcher (.txt from WhatsApp or Instagram)
+    private val chatFilePickerLauncher = registerForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            importChatStyleFile(uri)
+        }
+    }
+
+    private fun importChatStyleFile(uri: Uri) {
+        lifecycleScope.launch {
+            try {
+                contentResolver.openInputStream(uri)?.use { stream ->
+                    val text = stream.bufferedReader().use { it.readText() }
+                    statusText = "Calibrating chat style from transcript…"
+                    val calibrated = personaManager.calibrateFromChatExport(text, authManager.currentUser.email)
+                    personaProfile = calibrated
+                    val feedback = "Chat Style Calibrated! Tuned to ${calibrated.userName}."
+                    statusText = feedback
+                    ttsManager.speak("Aapka chat style seekh liya hai. Ab main aapke jaise bolunga.")
+                    Toast.makeText(this@MainActivity, feedback, Toast.LENGTH_LONG).show()
+                }
+            } catch (e: Exception) {
+                Toast.makeText(this@MainActivity, "Chat import failed: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     // Microphone Permission Request Handler
     private val requestPermissionLauncher = registerForActivityResult(
@@ -204,6 +242,13 @@ class MainActivity : FragmentActivity(), VoiceListener {
         authManager = AuthManager(this)
         vaultManager = EncryptedVaultManager(this)
         memoryManager = SupabaseMemoryManager(this)
+        personaManager = ChatPersonaManager(this)
+        personaProfile = personaManager.getPersona()
+
+        // Incoming WhatsApp/Instagram Notification Bridge
+        HydrogenNotificationListener.onIncomingChatReceived = { chat ->
+            incomingChat = chat
+        }
 
         isLoggedIn = authManager.currentUser.isLoggedIn
         currentScreen = if (isLoggedIn) "home" else "auth"
@@ -274,6 +319,19 @@ class MainActivity : FragmentActivity(), VoiceListener {
                             onOpenAccessibilitySettings = {
                                 HydrogenAccessibilityService.openAccessibilitySettings(this@MainActivity)
                             },
+                            incomingChat = incomingChat,
+                            onClearIncomingChat = { incomingChat = null },
+                            onReplyToChat = {
+                                processSpokenCommand("isko reply do", isVoiceInput = false)
+                            },
+                            personaProfile = personaProfile,
+                            onImportChatStyle = {
+                                chatFilePickerLauncher.launch("text/*")
+                            },
+                            isNotificationAccessGranted = isNotificationAccessGranted,
+                            onOpenNotificationSettings = {
+                                HydrogenNotificationListener.openNotificationAccessSettings(this@MainActivity)
+                            },
                             onMicClick = { toggleListening() },
                             onOpenVision = { openCameraLens() },
                             onPickGallery = { openGalleryPicker() },
@@ -311,6 +369,10 @@ class MainActivity : FragmentActivity(), VoiceListener {
         super.onResume()
         isAccessibilityEnabled = HydrogenAccessibilityService.isServiceEnabled()
         isFloatingOrbActive = FloatingJarvisService.isRunning
+        isNotificationAccessGranted = HydrogenNotificationListener.isPermissionGranted(this)
+        if (incomingChat == null) {
+            incomingChat = HydrogenNotificationListener.lastIncomingChat
+        }
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -459,6 +521,52 @@ class MainActivity : FragmentActivity(), VoiceListener {
                     } else false
                     if (!ok) {
                         Toast.makeText(this@MainActivity, "'${intent.query}' screen par nahi mila ya Accessibility band hai.", Toast.LENGTH_SHORT).show()
+                    }
+                    isLastNativeApp = false
+                }
+                ActionType.AI_AUTO_REPLY -> {
+                    val chat = incomingChat ?: HydrogenNotificationListener.lastIncomingChat
+                    if (chat != null) {
+                        val sender = chat.sender
+                        val incomingMsg = chat.message
+                        statusText = "$sender ke liye aapke style me reply taiyyar ho raha hai…"
+                        speak("$sender ko aapke style me reply taiyyar kar raha hoon.")
+
+                        val personaPrompt = personaManager.getPersonaSystemPrompt()
+                        val replyText = intentParser.generatePersonaReply(sender, incomingMsg, personaPrompt)
+
+                        statusText = "Replying: \"$replyText\""
+                        speak("Reply bhej diya: $replyText")
+
+                        // 1. Try Direct RemoteInput (background without opening app)
+                        val sentDirect = HydrogenNotificationListener.sendDirectReply(this@MainActivity, replyText)
+                        if (!sentDirect) {
+                            // 2. Fallback: Launch WhatsApp with auto-send armed
+                            HydrogenAccessibilityService.armAutoSend(true)
+                            AppRouter.launchWhatsApp(this@MainActivity, replyText)
+                        } else {
+                            Toast.makeText(this@MainActivity, "$sender ko reply bhej diya: $replyText", Toast.LENGTH_LONG).show()
+                        }
+
+                        // Save interaction & plan to Supabase
+                        val plan = AutonomousPlan(
+                            goal = "AI Representative Reply to $sender",
+                            cloudReasoning = "Incoming message: '$incomingMsg'. Drafted in calibrated persona: '$replyText'.",
+                            steps = listOf(
+                                AgentExecutionStep(1, "Intercept Message", "Captured from $sender: '$incomingMsg'", true),
+                                AgentExecutionStep(2, "Persona Tone Synthesis", "Generated personalized reply: '$replyText'", true),
+                                AgentExecutionStep(3, "Dispatch Message", "Sent via RemoteInput / WhatsApp", true)
+                            ),
+                            autoTypeText = replyText,
+                            targetApp = chat.packageName,
+                            learnedFact = "User approved auto-reply to $sender: '$replyText'"
+                        )
+                        memoryManager.recordInteraction(authManager.currentUser.email, spokenText, intent.copy(autonomousPlan = plan))
+                    } else {
+                        val noChatMsg = "Kiska reply dena hai? Recent me koi incoming message nahi mila. WhatsApp message aane par bole 'isko reply do'."
+                        statusText = noChatMsg
+                        speak(noChatMsg)
+                        Toast.makeText(this@MainActivity, noChatMsg, Toast.LENGTH_LONG).show()
                     }
                     isLastNativeApp = false
                 }

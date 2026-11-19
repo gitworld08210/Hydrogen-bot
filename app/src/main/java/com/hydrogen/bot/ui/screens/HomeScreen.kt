@@ -71,6 +71,8 @@ import com.hydrogen.bot.ui.theme.SlateDark
 import com.hydrogen.bot.ui.theme.SlateMuted
 import com.hydrogen.bot.ui.theme.SlateSecondary
 import com.hydrogen.bot.ui.theme.SurfacePearl
+import com.hydrogen.bot.notification.IncomingChat
+import com.hydrogen.bot.data.ChatPersona
 
 @Composable
 fun HomeScreen(
@@ -95,6 +97,13 @@ fun HomeScreen(
     isFloatingOrbActive: Boolean = false,
     onToggleFloatingOrb: (Boolean) -> Unit = {},
     onOpenAccessibilitySettings: () -> Unit = {},
+    incomingChat: IncomingChat? = null,
+    onClearIncomingChat: () -> Unit = {},
+    onReplyToChat: () -> Unit = {},
+    personaProfile: ChatPersona? = null,
+    onImportChatStyle: () -> Unit = {},
+    isNotificationAccessGranted: Boolean = false,
+    onOpenNotificationSettings: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     // Mode toggle between "Voice Chat" (Middle Screen) and "AI Ask" (Right Screen)
@@ -338,6 +347,85 @@ fun HomeScreen(
                     }
                 }
 
+                // Incoming WhatsApp/Instagram Message Alert Card (On-Demand Approval)
+                incomingChat?.let { chat ->
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Card(
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color(0xFFF0FDF4)),
+                        border = BorderStroke(1.dp, Color(0xFF86EFAC)),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = if (chat.packageName.contains("whatsapp")) "💬 WhatsApp" else "📸 Instagram",
+                                        fontWeight = FontWeight.Bold,
+                                        fontSize = 13.sp,
+                                        color = Color(0xFF166534)
+                                    )
+                                    Text(
+                                        text = "• ${chat.sender}",
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 13.sp,
+                                        color = SlateDark
+                                    )
+                                }
+                                IconButton(
+                                    onClick = onClearIncomingChat,
+                                    modifier = Modifier.size(22.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Close,
+                                        contentDescription = "Dismiss",
+                                        tint = SlateMuted,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+
+                            Text(
+                                text = "\"${chat.message}\"",
+                                fontSize = 14.sp,
+                                color = SlateDark,
+                                fontWeight = FontWeight.Normal
+                            )
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    onClick = onReplyToChat,
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF15803D)),
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.weight(1f).height(38.dp)
+                                ) {
+                                    Text("🤖 Reply As Me", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                }
+                                OutlinedButton(
+                                    onClick = onClearIncomingChat,
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.height(38.dp)
+                                ) {
+                                    Text("Ignore", color = SlateDark, fontSize = 13.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // JARVIS Autonomous Phone Controller Card
                 Spacer(modifier = Modifier.height(14.dp))
                 JarvisPhoneControllerCard(
@@ -345,6 +433,10 @@ fun HomeScreen(
                     isFloatingOrbActive = isFloatingOrbActive,
                     onToggleFloatingOrb = onToggleFloatingOrb,
                     onOpenAccessibilitySettings = onOpenAccessibilitySettings,
+                    personaProfile = personaProfile,
+                    onImportChatStyle = onImportChatStyle,
+                    isNotificationAccessGranted = isNotificationAccessGranted,
+                    onOpenNotificationSettings = onOpenNotificationSettings,
                     onQuickCommandClick = onQuickCommandClick
                 )
 
@@ -710,6 +802,10 @@ fun JarvisPhoneControllerCard(
     onToggleFloatingOrb: (Boolean) -> Unit,
     onOpenAccessibilitySettings: () -> Unit,
     onQuickCommandClick: (String) -> Unit,
+    personaProfile: ChatPersona? = null,
+    onImportChatStyle: () -> Unit = {},
+    isNotificationAccessGranted: Boolean = false,
+    onOpenNotificationSettings: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -795,11 +891,75 @@ fun JarvisPhoneControllerCard(
                 )
             }
 
+            // Chat Persona Tuning Section
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (personaProfile?.isCalibrated == true) "AI Chat Persona: Tuned 🟢" else "AI Chat Persona: Default",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = SlateDark
+                    )
+                    Text(
+                        text = if (personaProfile?.isCalibrated == true) "Chats sound like ${personaProfile.userName}" else "Import WhatsApp chat to tune tone",
+                        fontSize = 11.sp,
+                        color = SlateSecondary
+                    )
+                }
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFF1E293B))
+                        .clickable { onImportChatStyle() }
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                ) {
+                    Text(
+                        text = "📥 Import Style",
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+
+            // Notification Access (if not granted)
+            if (!isNotificationAccessGranted) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFFFEF3C7))
+                        .clickable { onOpenNotificationSettings() }
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "🔔 Allow Notification Access for Auto-Chat",
+                        fontSize = 11.sp,
+                        color = Color(0xFF92400E)
+                    )
+                    Text(
+                        text = "Grant ⚙️",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF92400E)
+                    )
+                }
+            }
+
             // Quick Gesture / Action Chips
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 modifier = Modifier.fillMaxWidth()
             ) {
+                item {
+                    JarvisChip("🤖 Isko Reply Do") { onQuickCommandClick("isko reply do") }
+                }
                 item {
                     JarvisChip("⬇️ Scroll Down") { onQuickCommandClick("scroll down") }
                 }

@@ -24,6 +24,7 @@ enum class ActionType {
     PHONE_RECENTS,
     PHONE_NOTIFICATIONS,
     AUTO_CLICK,
+    AI_AUTO_REPLY,
     GENERAL_QUERY
 }
 
