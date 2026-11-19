@@ -6,20 +6,28 @@
 [![Backend: Supabase](https://img.shields.io/badge/Backend-Supabase_Postgres-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com)
 [![Auth: Supabase & Resend](https://img.shields.io/badge/Auth-Email_OTP-000000?style=for-the-badge&logo=resend&logoColor=white)](https://supabase.com)
 [![Notifications: Firebase FCM](https://img.shields.io/badge/Notifications-Firebase_FCM-FFCA28?style=for-the-badge&logo=firebase&logoColor=black)](https://firebase.google.com)
-[![Latest Release](https://img.shields.io/badge/Release-v1.5_Stable-0284C7?style=for-the-badge&logo=android&logoColor=white)](https://github.com/gitworld08210/Hydrogen-bot/raw/main/release/HydrogenBot-v1.5.apk)
+[![Latest Release](https://img.shields.io/badge/Release-v1.6_Stable-0284C7?style=for-the-badge&logo=android&logoColor=white)](https://github.com/gitworld08210/Hydrogen-bot/raw/main/release/HydrogenBot-v1.6.apk)
 
 ---
 
-## 📲 Direct APK Download (v1.5 - Camera Crash Fix & Dual Source Lens)
+## 📲 Direct APK Download (v1.6 - Blinkit + Context Memory + Hermes Cloud Brain)
 
 Aap seedha apne Android phone me latest signed APK download aur install kar sakte hain:
 
-👉 **[Download HydrogenBot-v1.5.apk (Direct Download)](https://github.com/gitworld08210/Hydrogen-bot/raw/main/release/HydrogenBot-v1.5.apk)** *(Size: ~13.9 MB)*
+👉 **[Download HydrogenBot-v1.6.apk (Direct Download)](https://github.com/gitworld08210/Hydrogen-bot/raw/main/release/HydrogenBot-v1.6.apk)** *(Size: ~13.4 MB)*
 
-### 🆕 What's New in v1.5:
-* 🛠️ **Fixed Camera Close/Crash on Tap:** Resolved the issue where tapping the camera icon caused the app to close immediately. Added runtime `Manifest.permission.CAMERA` verification & permission launcher, added `<action android:name="android.media.action.IMAGE_CAPTURE" />` to Android 11+ `<queries>`, and protected camera launcher with safe exception handling.
-* 📷 / 🖼️ **Dual Source Gemini Vision Lens (Camera + Gallery):** Tapping the camera button now opens an elegant modal allowing users to either **"📷 Camera se Photo Lein"** or **"🖼️ Gallery / Screenshots se Chunein"**. Screenshots, product photos, and downloaded images can now be analyzed instantly without opening camera hardware!
-* 🛡️ **Global App Crash Guard (`HydrogenApp.kt`):** Added a global uncaught exception guard to prevent silent closes and gracefully surface error details.
+### 🆕 What's New in v1.6:
+* 🛒 **Native Blinkit Integration (10-Minute Grocery Delivery):**
+  * Say *"Blinkit pe dudh search karo"*, *"ब्लिंकिट पर बटर खोजो"*, or *"Blinkit kholo"* — bot directly launches official Blinkit app (`com.grofers.customerapp`) into instant search!
+  * Vision Result Card now includes a dedicated quick-tap **Yellow Blinkit Button** alongside Amazon and Flipkart.
+* 🧠 **Contextual Pronoun Memory ("Isko / Esko / This / It" Resolution):**
+  * Solved the issue where scanning a product and saying *"isko blinkit pe search karo"* failed.
+  * Voice engine now remembers the previously scanned/identified product and automatically substitutes pronouns (`isko`, `esko`, `ise`, `yeh`, `this`, `it`) with the real product name!
+* ☁️ **Hermes Agent Cloud Brain Connector (`HermesAgentClient.kt`):**
+  * Integrated OpenAI-compatible client connecting to Render.com cloud-deployed **Hermes Agent** (`NousResearch/hermes-agent`).
+  * 4-Tier Hybrid Execution Pipeline: Local Offline Rule Engine (0ms) ➔ Hermes Agent Cloud Brain ➔ Gemini Flash Lite Model Ladder ➔ Smart Conversational Fallback.
+* 📷 / 🖼️ **Dual Source Gemini Vision Lens (Camera + Gallery):** Full camera & gallery photo support with runtime permission guards.
+* 🛡️ **Global App Crash Guard (`HydrogenApp.kt`):** Zero crash tolerance with uncaught exception handler.
 * 📸 **Gemini Multimodal Vision Lens (`HomeScreen.kt` & `GeminiIntentParser.kt`):** Top bar me Camera icon tap karein ya bolen *"Photo scan karo"* — kisi bhi product ki photo khinchte hi Gemini Vision brand/product pehchaan kar screen par **"Search on Amazon"** aur **"Search on Flipkart"** direct buttons show karta hai!
 * 🌅 **Jarvis Morning Briefing & Battery Guard:** *"Good morning"* ya *"Battery check"* bolne par bot live battery status, time aur personalized Hindi greeting audio me bolta hai. (Agar battery <25% hai toh low-battery alert deta hai).
 * 💬 **WhatsApp Pre-filled Voice Messaging:** *"WhatsApp pe Mummy ko message bhejo 10 minute me aa raha hu"* bolne par seedha WhatsApp khulta hai aur text box me message already type ho jata hai.

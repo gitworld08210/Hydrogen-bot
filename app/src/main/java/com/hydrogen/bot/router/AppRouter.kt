@@ -263,4 +263,82 @@ object AppRouter {
             )
         }
     }
+
+    /**
+     * Launches Blinkit Native App (com.grofers.customerapp) directly into search or home.
+     */
+    fun launchBlinkitSearch(context: Context, query: String): LaunchResult {
+        val isInstalled = isAppInstalled(context, PackageRegistry.BLINKIT_PACKAGE)
+        val cleanQuery = query.trim()
+        val encodedQuery = Uri.encode(cleanQuery)
+
+        return if (isInstalled) {
+            try {
+                val intent = if (cleanQuery.isBlank()) {
+                    context.packageManager.getLaunchIntentForPackage(PackageRegistry.BLINKIT_PACKAGE)?.apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    } ?: Intent(Intent.ACTION_VIEW, Uri.parse("https://blinkit.com")).apply {
+                        setPackage(PackageRegistry.BLINKIT_PACKAGE)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                } else {
+                    Intent(Intent.ACTION_VIEW).apply {
+                        data = Uri.parse("https://blinkit.com/s/?q=$encodedQuery")
+                        setPackage(PackageRegistry.BLINKIT_PACKAGE)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                }
+                context.startActivity(intent)
+                LaunchResult(
+                    success = true,
+                    targetApp = "Blinkit",
+                    isNativeApp = true,
+                    message = if (cleanQuery.isBlank()) "Blinkit App open kar diya hai." else "Blinkit App par '$cleanQuery' search khol diya hai."
+                )
+            } catch (e: Exception) {
+                try {
+                    val fallbackIntent = Intent(Intent.ACTION_VIEW).apply {
+                        data = Uri.parse("grofers://search?q=$encodedQuery")
+                        setPackage(PackageRegistry.BLINKIT_PACKAGE)
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    }
+                    context.startActivity(fallbackIntent)
+                    LaunchResult(
+                        success = true,
+                        targetApp = "Blinkit",
+                        isNativeApp = true,
+                        message = "Blinkit App khol diya hai."
+                    )
+                } catch (ex: Exception) {
+                    LaunchResult(
+                        success = false,
+                        targetApp = "Blinkit",
+                        isNativeApp = false,
+                        message = "Blinkit launch error: ${ex.localizedMessage}"
+                    )
+                }
+            }
+        } else {
+            // Web / browser fallback
+            try {
+                val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse("https://blinkit.com/s/?q=$encodedQuery")).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                }
+                context.startActivity(webIntent)
+                LaunchResult(
+                    success = true,
+                    targetApp = "Blinkit Web",
+                    isNativeApp = false,
+                    message = "Blinkit app phone me nahi mili, browser me search open kar diya hai."
+                )
+            } catch (e: Exception) {
+                LaunchResult(
+                    success = false,
+                    targetApp = "Blinkit",
+                    isNativeApp = false,
+                    message = "Phone me Blinkit app install nahi mili."
+                )
+            }
+        }
+    }
 }

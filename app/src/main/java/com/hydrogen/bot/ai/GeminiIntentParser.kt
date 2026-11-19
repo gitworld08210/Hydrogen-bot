@@ -21,12 +21,18 @@ data class VisionResult(
     val flipkartQuery: String
 )
 
-class GeminiIntentParser(private val apiKey: String? = null) {
+class GeminiIntentParser(
+    private val apiKey: String? = null,
+    private val hermesUrl: String? = null,
+    private val hermesKey: String? = null
+) {
 
     private val client = OkHttpClient.Builder()
         .connectTimeout(6, TimeUnit.SECONDS)
         .readTimeout(10, TimeUnit.SECONDS)
         .build()
+
+    private val hermesClient = if (!hermesUrl.isNullOrBlank()) HermesAgentClient(hermesUrl, hermesKey) else null
 
     // Mark-LVII Verified Model Ladder (Ultra-low latency first)
     private val modelLadder = listOf(
@@ -36,29 +42,47 @@ class GeminiIntentParser(private val apiKey: String? = null) {
     )
 
     /**
-     * Parses spoken text into an actionable intent.
+     * Parses spoken text into an actionable intent with Contextual Pronoun Resolution.
      * Uses Fast Offline Rule Engine first (0ms latency, Hindi & English),
-     * and escalates to Mark-LVII Gemini Model Ladder if needed.
+     * and escalates to Hermes Cloud Agent (Render) -> Mark-LVII Gemini Model Ladder if needed.
      */
-    suspend fun parse(spokenText: String): ParsedIntent = withContext(Dispatchers.Default) {
-        val cleanText = spokenText.trim().lowercase()
+    suspend fun parse(spokenText: String, contextProduct: String? = null): ParsedIntent = withContext(Dispatchers.Default) {
+        var cleanText = spokenText.trim().lowercase()
+
+        // Contextual Pronoun Resolution (e.g. "isko search karo blinkit pe" -> "Butter search karo blinkit pe")
+        if (!contextProduct.isNullOrBlank()) {
+            val pronouns = listOf("isko", "esko", "ise", "isse", "yeh", "ye", "this", "it", "is product ko", "isko bhi")
+            for (p in pronouns) {
+                if (cleanText.contains(p)) {
+                    cleanText = cleanText.replace(p, contextProduct.lowercase())
+                }
+            }
+        }
 
         // 1. FAST LOCAL RULE ENGINE (Hindi Devanagari & English/Hinglish)
-        val offlineIntent = parseOfflineRules(cleanText, spokenText)
+        val offlineIntent = parseOfflineRules(cleanText, spokenText, contextProduct)
         if (offlineIntent != null) {
             return@withContext offlineIntent
         }
 
-        // 2. MARK-LVII GEMINI MULTI-TIER LADDER
+        // 2. HERMES CLOUD AGENT (RENDER.COM)
+        if (hermesClient?.isConfigured == true) {
+            val hermesIntent = hermesClient.parseIntentWithHermes(cleanText, contextProduct)
+            if (hermesIntent != null) {
+                return@withContext hermesIntent
+            }
+        }
+
+        // 3. MARK-LVII GEMINI MULTI-TIER LADDER
         val key = apiKey?.trim() ?: ""
         if (key.isNotBlank()) {
-            val geminiIntent = parseWithModelLadder(key, spokenText)
+            val geminiIntent = parseWithModelLadder(key, spokenText, contextProduct)
             if (geminiIntent != null) {
                 return@withContext geminiIntent
             }
         }
 
-        // 3. SMART CONVERSATIONAL FALLBACK
+        // 4. SMART CONVERSATIONAL FALLBACK
         val conversationalReply = when {
             cleanText.contains("kaise ho") || cleanText.contains("kaisa hai") || cleanText.contains("how are you") ->
                 "Main ekdum badhiya hoon! Bataiye, aaj main aapki kya madad karoon?"
@@ -69,7 +93,7 @@ class GeminiIntentParser(private val apiKey: String? = null) {
             cleanText.contains("shukriya") || cleanText.contains("dhanyawad") || cleanText.contains("thank") ->
                 "Aapka swaagat hai! Hamesha aapki seva me haazir hoon."
             else ->
-                "Main sun raha hoon. Aap Amazon, YouTube, Flipkart, WhatsApp ya koi sawaal pooch sakte hain."
+                "Main sun raha hoon. Aap Amazon, YouTube, Flipkart, Blinkit, WhatsApp ya koi sawaal pooch sakte hain."
         }
 
         ParsedIntent(
@@ -80,7 +104,7 @@ class GeminiIntentParser(private val apiKey: String? = null) {
         )
     }
 
-    private fun parseOfflineRules(clean: String, original: String): ParsedIntent? {
+    private fun parseOfflineRules(clean: String, original: String, contextProduct: String? = null): ParsedIntent? {
         // Morning Briefing / Battery Check
         if (clean.contains("good morning") || clean.contains("गुड मॉर्निंग") || clean.contains("सुप्रभात") ||
             clean.contains("briefing") || clean.contains("ब्रीफिंग") || clean.contains("battery") || clean.contains("बैटरी")) {
@@ -103,14 +127,36 @@ class GeminiIntentParser(private val apiKey: String? = null) {
             )
         }
 
+        // Blinkit patterns (Hindi: ब्लिंकिट, ग्रोफर्स | English: blinkit, grofers, blnkit)
+        if (clean.contains("blinkit") || clean.contains("ब्लिंकिट") || clean.contains("blnkit") ||
+            clean.contains("blink it") || clean.contains("grofers") || clean.contains("ग्रोफर्स")) {
+            var query = extractQuery(clean, listOf(
+                "blinkit pe", "blinkit par", "blinkit me", "blinkit", "ब्लिंकिट पे", "ब्लिंकिट पर", "ब्लिंकिट",
+                "blink it pe", "blink it", "grofers pe", "grofers", "ग्रोफर्स",
+                "search karo", "dhundo", "mangwao", "order karo", "search for", "charc karo", "खोजो", "ढूंढो", "मंगवाओ"
+            ))
+            if (query.isBlank() && !contextProduct.isNullOrBlank()) {
+                query = contextProduct
+            }
+            return ParsedIntent(
+                action = ActionType.SEARCH_BLINKIT,
+                targetApp = "Blinkit",
+                query = query,
+                speechFeedback = if (query.isEmpty()) "Blinkit App open kar raha hoon." else "Blinkit App par '$query' search kar raha hoon."
+            )
+        }
+
         // YouTube patterns (Hindi: यूट्यूब, यू ट्यूब, गाना, गाने, वीडियो | English: youtube, song, video)
         if (clean.contains("youtube") || clean.contains("यूट्यूब") || clean.contains("यू ट्यूब") ||
             clean.contains("gaana") || clean.contains("गाना") || clean.contains("गाने") ||
             clean.contains("song") || clean.contains("video") || clean.contains("वीडियो")) {
-            val query = extractQuery(clean, listOf(
+            var query = extractQuery(clean, listOf(
                 "youtube pe", "youtube par", "youtube me", "youtube", "यूट्यूब पे", "यूट्यूब पर", "यूट्यूब", "यू ट्यूब",
                 "chalao", "play", "search", "video", "dikhao", "song", "gaana", "gaane", "sunao", "खोल", "चलाओ", "दिखाओ", "गाना"
             ))
+            if (query.isBlank() && !contextProduct.isNullOrBlank()) {
+                query = contextProduct
+            }
             return ParsedIntent(
                 action = ActionType.SEARCH_YOUTUBE,
                 targetApp = "YouTube",
@@ -122,10 +168,13 @@ class GeminiIntentParser(private val apiKey: String? = null) {
         // Amazon patterns (Hindi: अमेज़न, अमेजॉन, अमेजन | English: amazon, amzon, amezon)
         if (clean.contains("amazon") || clean.contains("अमेज़न") || clean.contains("अमेजॉन") || clean.contains("अमेजन") ||
             clean.contains("amzon") || clean.contains("amezon")) {
-            val query = extractQuery(clean, listOf(
+            var query = extractQuery(clean, listOf(
                 "amazon pe", "amazon par", "amazon me", "amazon", "अमेज़न पे", "अमेज़न पर", "अमेज़न", "अमेजॉन", "अमेजन",
                 "search karo", "dhundo", "search for", "buy", "kharido", "खोजो", "ढूंढो", "खरीदो"
             ))
+            if (query.isBlank() && !contextProduct.isNullOrBlank()) {
+                query = contextProduct
+            }
             return ParsedIntent(
                 action = ActionType.SEARCH_AMAZON,
                 targetApp = "Amazon India",
@@ -136,10 +185,13 @@ class GeminiIntentParser(private val apiKey: String? = null) {
 
         // Flipkart patterns (Hindi: फ्लिपकार्ट | English: flipkart, flipcart)
         if (clean.contains("flipkart") || clean.contains("फ्लिपकार्ट") || clean.contains("flipcart")) {
-            val query = extractQuery(clean, listOf(
+            var query = extractQuery(clean, listOf(
                 "flipkart pe", "flipkart par", "flipkart me", "flipkart", "फ्लिपकार्ट पे", "फ्लिपकार्ट पर", "फ्लिपकार्ट",
                 "search karo", "dhundo", "kharido", "deals", "खोजो", "ढूंढो"
             ))
+            if (query.isBlank() && !contextProduct.isNullOrBlank()) {
+                query = contextProduct
+            }
             return ParsedIntent(
                 action = ActionType.SEARCH_FLIPKART,
                 targetApp = "Flipkart",
@@ -200,12 +252,17 @@ class GeminiIntentParser(private val apiKey: String? = null) {
      * Mark-LVII Multi-Model Ladder:
      * Walks through the models (gemini-3.5-flash-lite -> gemini-flash-lite-latest -> gemini-3.8-flash).
      */
-    private suspend fun parseWithModelLadder(key: String, spokenText: String): ParsedIntent? = withContext(Dispatchers.IO) {
+    private suspend fun parseWithModelLadder(key: String, spokenText: String, contextProduct: String? = null): ParsedIntent? = withContext(Dispatchers.IO) {
+        val contextInstruction = if (!contextProduct.isNullOrBlank()) {
+            "Previously scanned product context: \"$contextProduct\". If the user says 'isko', 'esko', 'ise', 'this', 'it', or refers to searching or buying the scanned item, search for \"$contextProduct\"."
+        } else ""
+
         val systemPrompt = """
             You are Hydrogen Bot, an ultra-fast autonomous AI voice assistant on Android.
             The user speaks to you in Hindi, Hinglish, or English: "$spokenText".
-            1. If the user wants to open or search an app (Amazon, YouTube, Flipkart, WhatsApp, IRCTC):
-               {"action": "SEARCH_AMAZON" | "SEARCH_YOUTUBE" | "SEARCH_FLIPKART" | "SEND_WHATSAPP" | "BOOK_TICKET_IRCTC", "targetApp": "Amazon India" | "YouTube" | "Flipkart" | "WhatsApp" | "IRCTC", "query": "extracted clean query or empty", "speechFeedback": "Short polite Hindi confirmation (e.g. 'YouTube khol raha hoon.')"}
+            $contextInstruction
+            1. If the user wants to open or search an app (Amazon, YouTube, Flipkart, Blinkit, WhatsApp, IRCTC):
+               {"action": "SEARCH_AMAZON" | "SEARCH_YOUTUBE" | "SEARCH_FLIPKART" | "SEARCH_BLINKIT" | "SEND_WHATSAPP" | "BOOK_TICKET_IRCTC", "targetApp": "Amazon India" | "YouTube" | "Flipkart" | "Blinkit" | "WhatsApp" | "IRCTC", "query": "extracted clean query or empty", "speechFeedback": "Short polite Hindi confirmation (e.g. 'Blinkit par dhoondh raha hoon.')"}
             2. If user asks for morning briefing or battery:
                {"action": "MORNING_BRIEFING", "targetApp": "Hydrogen Assistant", "query": "", "speechFeedback": "Daily briefing generate kar raha hoon."}
             3. If user wants camera or scan:

@@ -89,6 +89,7 @@ fun HomeScreen(
     onClearVision: () -> Unit = {},
     onSearchAmazon: (String) -> Unit = {},
     onSearchFlipkart: (String) -> Unit = {},
+    onSearchBlinkit: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     // Mode toggle between "Voice Chat" (Middle Screen) and "AI Ask" (Right Screen)
@@ -424,6 +425,16 @@ fun HomeScreen(
                                     ) {
                                         Text("Flipkart", color = Color.White, fontSize = 13.sp)
                                     }
+                                }
+                                Button(
+                                    onClick = { onSearchBlinkit(vision.productName) },
+                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFF7C324)),
+                                    shape = RoundedCornerShape(20.dp),
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .height(42.dp)
+                                ) {
+                                    Text("Blinkit", color = Color(0xFF111215), fontWeight = FontWeight.Bold, fontSize = 13.sp)
                                 }
                             }
                         }

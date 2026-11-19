@@ -47,7 +47,13 @@ class MainActivity : FragmentActivity(), VoiceListener {
     private lateinit var ttsManager: TextToSpeechManager
     private lateinit var authManager: AuthManager
     private lateinit var vaultManager: EncryptedVaultManager
-    private val intentParser by lazy { GeminiIntentParser(BuildConfig.GEMINI_API_KEY) }
+    private val intentParser by lazy {
+        GeminiIntentParser(
+            apiKey = BuildConfig.GEMINI_API_KEY,
+            hermesUrl = BuildConfig.HERMES_AGENT_URL,
+            hermesKey = BuildConfig.HERMES_AGENT_KEY
+        )
+    }
 
     // Observable UI State
     private var isListening by mutableStateOf(false)
@@ -253,6 +259,9 @@ class MainActivity : FragmentActivity(), VoiceListener {
                             onSearchFlipkart = { query ->
                                 AppRouter.launchFlipkartSearch(this@MainActivity, query)
                             },
+                            onSearchBlinkit = { query ->
+                                AppRouter.launchBlinkitSearch(this@MainActivity, query)
+                            },
                             onOpenVault = {
                                 BiometricAuthHelper.promptBiometric(
                                     activity = this@MainActivity,
@@ -300,7 +309,7 @@ class MainActivity : FragmentActivity(), VoiceListener {
     private fun processSpokenCommand(spokenText: String) {
         statusText = "Hydrogen is reasoning…"
         lifecycleScope.launch {
-            val intent = intentParser.parse(spokenText)
+            val intent = intentParser.parse(spokenText, visionResult?.productName)
             lastIntent = intent
             statusText = intent.speechFeedback
 
@@ -323,6 +332,14 @@ class MainActivity : FragmentActivity(), VoiceListener {
                     ttsManager.speak(intent.speechFeedback)
                     val result = AppRouter.launchFlipkartSearch(this@MainActivity, intent.query)
                     isLastNativeApp = result.isNativeApp
+                }
+                ActionType.SEARCH_BLINKIT, ActionType.QUICK_CART_BLINKIT -> {
+                    ttsManager.speak(intent.speechFeedback)
+                    val result = AppRouter.launchBlinkitSearch(this@MainActivity, intent.query)
+                    isLastNativeApp = result.isNativeApp
+                    if (!result.success) {
+                        Toast.makeText(this@MainActivity, result.message, Toast.LENGTH_LONG).show()
+                    }
                 }
                 ActionType.SEND_WHATSAPP -> {
                     ttsManager.speak(intent.speechFeedback)
