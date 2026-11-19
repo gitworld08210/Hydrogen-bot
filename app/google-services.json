@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "933152685603",
+    "project_id": "oneleven-a669b",
+    "storage_bucket": "oneleven-a669b.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:933152685603:android:2220580db3a2ad3853fb96",
+        "android_client_info": {
+          "package_name": "com.hydrogen.bot"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDjJMHHvXs8dmPuFwDz1CYpeog6Ywk8QiI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:933152685603:android:cc9152bac789fe3153fb96",
+        "android_client_info": {
+          "package_name": "com.oneleven.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDjJMHHvXs8dmPuFwDz1CYpeog6Ywk8QiI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
